@@ -67,33 +67,38 @@
         const props = {
             lineWidth: 3, // 线的粗细
             penColor: '#000', // 线的色值
-        }
-        // 调笔的粗细、色值等
-        const lineWidthInput = document.querySelector('input[name="line-width"]');
-        const colorInput = document.querySelector('input[type="color"]');
-        lineWidthInput.addEventListener('input', (e) => {
-            props.lineWidth = e.target.value;
-        })
-        colorInput.addEventListener('input', (e) => {
-            props.penColor = e.target.value;
+        };
+
+        // 【表单录入】录入调笔的粗细、色值等
+        const lineSet = {
+            lineWidthInput: document.querySelector('input[name="line-width"]'),
+            colorInput: document.querySelector('input[type="color"]')
+        };
+        lineSet.lineWidthInput.addEventListener('input', (e) => {
+            props.lineWidth = e.target.value || props.lineWidth;
         });
-        // canvas画布
+        lineSet.colorInput.addEventListener('input', (e) => {
+            props.penColor = e.target.value || props.penColor;
+        });
+
+        // 【画布🎨 和 画笔🖌】就绪
         const canvas = document.querySelector('canvas');
         // 获取2D上下文（画笔🖌）
         const ctx = canvas.getContext('2d');
         console.log(ctx);
 
-        // 初始记录些东西
-        let startPoint = {x: '', y: ''};
+        // -----公共方法：画个线方法-----
         function drawLine(xStart, yStart, xEnd, yEnd) {
             ctx.beginPath();
             ctx.moveTo(xStart, yStart);
             ctx.lineTo(xEnd, yEnd);
             ctx.stroke();
-            // ctx.closePath();
         }
 
+        // -----公共方法：计算鼠标/手指当前 相对于canvas元素的坐标-----
         function getPosition(e) {
+            // 移动端的事件里没有offsetX 和 offsetY
+            // 所以得 touch.clientX(当前手指坐标距离屏幕的距离) - rect.left（canvas元素距离屏幕的距离） = 当前手指坐标到canvas元素的坐标
             if (e.type.includes('touch')) {
                 const touch = e.touches[0] || e.changedTouches[0];
                 const rect = canvas.getBoundingClientRect();
@@ -105,13 +110,18 @@
             }
         }
 
-        // 【鼠标按下】记录起始坐标
+        // 初始记录些东西
+        let startPoint = {x: '', y: ''};
+
+        // 【鼠标/手指按下】记录起始坐标
         function startDraw(e) {
-            console.log('画笔状态', e);
+            console.log('记录起始坐标 => ', e);
             startPoint.x = getPosition(e)[0];
             startPoint.y = getPosition(e)[1];
             ctx.lineWidth = props.lineWidth;
             ctx.strokeStyle = props.penColor;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
         }
         canvas.addEventListener('mousedown', startDraw);
         canvas.addEventListener('touchstart', function(e) {
@@ -119,30 +129,18 @@
             startDraw(e)
         });
 
-        // 【鼠标移动】
+        // 【鼠标/手指移动】！！！ 每次移动，都画线。不就是一直在画画了吗
         function ingDraw(e) {
-            // console.log(e)
             if (!startPoint.x) {
-                console.log(1);
                 return
             };
-            console.log(2);
             
             let newPoint = {
                 x: getPosition(e)[0],
                 y: getPosition(e)[1]
             };
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
             drawLine(startPoint.x, startPoint.y, newPoint.x, newPoint.y);
             startPoint = newPoint;
-            // if (startPoint.x !== '' && startPoint.y !== '') {
-            //     ctx.beginPath();
-            //     ctx.moveTo(startPoint.x, startPoint.y);
-            //     ctx.lineTo(newPoint.x, newPoint.y);
-            //     ctx.stroke();
-            //     startPoint = newPoint;
-            // }
         }
         canvas.addEventListener('mousemove', ingDraw);
         canvas.addEventListener('touchmove', function(e) {
@@ -150,7 +148,7 @@
             ingDraw(e);
         });
 
-        // 【鼠标抬起】
+        // 【鼠标/手指抬起】
         function stopDrawing() {
             startPoint.x = '';
             startPoint.y = '';
@@ -167,11 +165,11 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         })
 
-        // 【业务功能】查看图片
+        // 【业务功能】查看图片。核心代码canvas.toDataURL('image/png')将canvas转为图片
         const btnOk = document.querySelector('.btn-ok');
         btnOk.addEventListener('click', () => {
             const dataUrl = canvas.toDataURL('image/png');
-            console.log(dataUrl);
+            console.log('打印下图片 => ', dataUrl);
             const lll = document.createElement('div');
             lll.classList.add('img-con');
             lll.style.cssText = 'display: flex; justify-content: center; margin-top: 20px;';
@@ -183,7 +181,7 @@
             document.querySelector('.btn-options').after(lll)
         })
 
-        // 【业务功能】下载图片
+        // 【业务功能】下载图片。创建a标签，将href设置为图片链接触发下载
         document.querySelector('.btn-downLoad').addEventListener('click', () => {
             const link = document.createElement('a');
             link.download = '签名_' + new Date().toISOString().slice(0, 10) + '.png';
