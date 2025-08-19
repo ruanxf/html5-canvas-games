@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>电子签名板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: none;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+            text-align: center;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .signature-container {
+            position: relative;
+            width: 100%;
+            border: 2px solid #333;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            touch-action: none;
+        }
+        
+        #signature-canvas {
+            display: block;
+            width: 100%;
+            height: 400px;
+            touch-action: none;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            max-width: 400px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        #clear-btn {
+            background-color: #f44336;
+        }
+        
+        #clear-btn:hover {
+            background-color: #d32f2f;
+        }
+        
+        #save-btn {
+            background-color: #2196F3;
+        }
+        
+        #save-btn:hover {
+            background-color: #0b7dda;
+        }
+        
+        .orientation-warning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .orientation-warning.show {
+            display: flex;
+        }
+        
+        @media (max-width: 600px) {
+            #signature-canvas {
+                height: 300px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+        }
+        
+        @media (orientation: portrait) {
+            .signature-container {
+                max-height: 60vh;
+            }
+        }
+        
+        @media (orientation: landscape) {
+            .signature-container {
+                max-height: 80vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>电子签名板</h1>
+        <div class="signature-container">
+            <canvas id="signature-canvas"></canvas>
+        </div>
+        <div class="button-group">
+            <button id="clear-btn">清除签名</button>
+            <button id="save-btn">保存签名</button>
+        </div>
+    </div>
+    
+    <div class="orientation-warning" id="orientation-warning">
+        <h2>为了更好的签名体验</h2>
+        <p>请将设备旋转至横屏模式</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('signature-canvas');
+            const ctx = canvas.getContext('2d');
+            const clearBtn = document.getElementById('clear-btn');
+            const saveBtn = document.getElementById('save-btn');
+            const orientationWarning = document.getElementById('orientation-warning');
+            
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+            
+            // 初始化画布
+            function initCanvas() {
+                const container = canvas.parentElement;
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                
+                // 设置画布尺寸
+                canvas.width = width;
+                canvas.height = height;
+                
+                // 清除画布
+                clearCanvas();
+                
+                // 设置绘图样式
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+            }
+            
+            // 清除画布
+            function clearCanvas() {
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            
+            // 开始绘制
+            function startDrawing(e) {
+                isDrawing = true;
+                [lastX, lastY] = getPosition(e);
+            }
+            
+            // 绘制中
+            function draw(e) {
+                if (!isDrawing) return;
+                
+                const [x, y] = getPosition(e);
+                
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                
+                [lastX, lastY] = [x, y];
+            }
+            
+            // 结束绘制
+            function stopDrawing() {
+                isDrawing = false;
+            }
+            
+            // 获取坐标位置
+            function getPosition(e) {
+                let x, y;
+                
+                if (e.type.includes('touch')) {
+                    const touch = e.touches[0] || e.changedTouches[0];
+                    const rect = canvas.getBoundingClientRect();
+                    x = touch.clientX - rect.left;
+                    y = touch.clientY - rect.top;
+                } else {
+                    const rect = canvas.getBoundingClientRect();
+                    x = e.clientX - rect.left;
+                    y = e.clientY - rect.top;
+                }
+                
+                return [x, y];
+            }
+            
+            // 保存签名
+            function saveSignature() {
+                // 检查画布是否空白
+                const blank = document.createElement('canvas');
+                blank.width = canvas.width;
+                blank.height = canvas.height;
+                if (canvas.toDataURL() === blank.toDataURL()) {
+                    alert('请先签名再保存');
+                    return;
+                }
+                
+                try {
+                    const dataURL = canvas.toDataURL('image/png');
+                    const link = document.createElement('a');
+                    link.download = '签名_' + new Date().toISOString().slice(0, 10) + '.png';
+                    link.href = dataURL;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    alert('签名已保存为PNG图片');
+                } catch (error) {
+                    alert('保存失败: ' + error.message);
+                }
+            }
+            
+            // 检查屏幕方向
+            function checkOrientation() {
+                if (window.innerHeight > window.innerWidth) {
+                    orientationWarning.classList.add('show');
+                } else {
+                    orientationWarning.classList.remove('show');
+                }
+            }
+            
+            // 初始化
+            initCanvas();
+            window.addEventListener('resize', initCanvas);
+            window.addEventListener('orientationchange', function() {
+                initCanvas();
+                checkOrientation();
+            });
+            
+            // 事件监听
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            
+            canvas.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                startDrawing(e);
+            });
+            
+            canvas.addEventListener('touchmove', function(e) {
+                e.preventDefault();
+                draw(e);
+            });
+            
+            canvas.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                stopDrawing();
+            });
+            
+            clearBtn.addEventListener('click', clearCanvas);
+            saveBtn.addEventListener('click', saveSignature);
+            
+            // 初始方向检查
+            checkOrientation();
+        });
+    </script>
+</body>
+</html>

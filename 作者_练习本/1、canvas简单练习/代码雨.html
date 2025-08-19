@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>黑客帝国代码雨</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            position: relative;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 20px;
+            position: relative;
+            z-index: 10;
+        }
+        
+        h1 {
+            font-size: 2.8rem;
+            text-shadow: 0 0 10px #0f0, 0 0 20px #0f0;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            animation: pulse 2s infinite;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.8;
+            margin-bottom: 20px;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        button {
+            background: rgba(0, 30, 0, 0.7);
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 10px 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 3px;
+            text-shadow: 0 0 5px #0f0;
+        }
+        
+        button:hover {
+            background: rgba(0, 60, 0, 0.9);
+            box-shadow: 0 0 10px #0f0;
+        }
+        
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 15px;
+            font-size: 0.9rem;
+            opacity: 0.7;
+            position: relative;
+            z-index: 10;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { opacity: 0.8; }
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .subtitle {
+                font-size: 1rem;
+            }
+            
+            button {
+                padding: 8px 15px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>数字矩阵</h1>
+        <div class="subtitle">模拟黑客帝国代码雨效果</div>
+        <div class="controls">
+            <button id="pauseBtn">暂停/继续</button>
+            <button id="themeBtn">切换主题</button>
+            <button id="speedBtn">改变速度</button>
+            <button id="densityBtn">改变密度</button>
+        </div>
+    </div>
+    
+    <div class="canvas-container">
+        <canvas id="matrixCanvas"></canvas>
+    </div>
+    
+    <div class="footer">
+        <p>使用HTML5 Canvas实现的代码雨效果 | 字符数: <span id="charCount">0</span></p>
+    </div>
+
+    <script>
+        // 获取Canvas元素和上下文
+        const canvas = document.getElementById('matrixCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 设置Canvas大小为窗口大小
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // 字符集 - 包含数字、拉丁字母、日文字符和特殊符号
+        const characters = '01';
+        
+        // 雨滴数组
+        const drops = [];
+        const fontSize = 18;
+        const columns = Math.floor(canvas.width / fontSize);
+        
+        // 初始化雨滴
+        for (let i = 0; i < columns; i++) {
+            drops[i] = Math.floor(Math.random() * canvas.height / fontSize);
+        }
+        
+        // 动画控制变量
+        let isPaused = false;
+        let themeColor = '#0f0'; // 默认绿色主题
+        let speedFactor = 1;
+        let density = 1;
+        let charCount = 0;
+        
+        // 绘制函数
+        function draw() {
+            if (isPaused) return;
+            
+            // 半透明黑色覆盖层，创建拖尾效果
+            ctx.fillStyle = `rgba(0, 0, 0, 0.05)`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.font = `${fontSize}px monospace`;
+            
+            // 绘制每个雨滴
+            for (let i = 0; i < columns; i++) {
+                // 随机跳过一些列以控制密度
+                if (Math.random() > density) continue;
+                
+                // 获取随机字符
+                const char = characters.charAt(Math.floor(Math.random() * characters.length));
+                
+                // 设置颜色 - 第一个字符为白色，其他为绿色
+                ctx.fillStyle = drops[i] * fontSize < fontSize * 5 ? '#fff' : themeColor;
+                
+                // 绘制字符
+                ctx.fillText(char, i * fontSize, drops[i] * fontSize);
+                
+                // 重置超出屏幕的雨滴
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                
+                // 移动雨滴
+                drops[i] += speedFactor;
+                
+                // 增加字符计数
+                charCount++;
+            }
+            
+            // 更新字符计数显示
+            document.getElementById('charCount').textContent = charCount;
+            
+            // 继续动画循环
+            requestAnimationFrame(draw);
+        }
+        
+        // 初始化绘制
+        draw();
+        
+        // 按钮事件监听
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            isPaused = !isPaused;
+            if (!isPaused) {
+                requestAnimationFrame(draw);
+            }
+        });
+        
+        document.getElementById('themeBtn').addEventListener('click', () => {
+            // 在绿色、蓝色和紫色之间切换
+            if (themeColor === '#0f0') {
+                themeColor = '#0ff';
+            } else if (themeColor === '#0ff') {
+                themeColor = '#f0f';
+            } else {
+                themeColor = '#0f0';
+            }
+        });
+        
+        document.getElementById('speedBtn').addEventListener('click', () => {
+            // 在三种速度之间循环
+            if (speedFactor === 1) {
+                speedFactor = 1.5;
+            } else if (speedFactor === 1.5) {
+                speedFactor = 2;
+            } else {
+                speedFactor = 1;
+            }
+        });
+        
+        document.getElementById('densityBtn').addEventListener('click', () => {
+            // 在三种密度之间循环
+            if (density === 1) {
+                density = 0.75;
+            } else if (density === 0.75) {
+                density = 0.5;
+            } else {
+                density = 1;
+            }
+        });
+        
+        // 窗口大小调整时重置Canvas
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // 重新初始化雨滴
+            drops.length = 0;
+            const newColumns = Math.floor(canvas.width / fontSize);
+            for (let i = 0; i < newColumns; i++) {
+                drops[i] = Math.floor(Math.random() * canvas.height / fontSize);
+            }
+        });
+    </script>
+</body>
+</html>

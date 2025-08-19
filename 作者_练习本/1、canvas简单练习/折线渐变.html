@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script>
+        let canvas = document.createElement('canvas');
+        canvas.width = 600;
+        canvas.height = 600;
+        canvas.style.cssText = 'border: 1px solid;'
+        document.body.append(canvas);
+
+        let ctx = canvas.getContext('2d');
+        ctx.lineWidth = 20;
+
+        let g = ctx.createLinearGradient(100, 0, 350, 0);
+        g.addColorStop(0, 'red');
+        g.addColorStop(0.3, 'blue');
+        g.addColorStop(0.5, 'green');
+        g.addColorStop(.9, 'pink');
+
+        // ctx.fillStyle = 'red';
+        // ctx.fillRect(0, 0, 600, 600)
+
+        ctx.strokeStyle = g;
+        // ctx.lineCap = 'round'
+        // ctx.lineJoin = 'miter'
+        ctx.beginPath();
+        ctx.moveTo(100, 200);
+        ctx.lineTo(200, 100);
+        ctx.lineTo(250, 150);
+        ctx.lineTo(350, 100);
+        ctx.stroke();
+    </script>
+</body>
+</html>

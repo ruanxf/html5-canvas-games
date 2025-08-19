@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能贪吃蛇对战</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            position: relative;
+            display: none;
+        }
+        #game-canvas {
+            border: 2px solid #333;
+            background-color: #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 18px;
+            background-color: rgba(255,255,255,0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        #start-screen {
+            text-align: center;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #4CAF50;
+            margin-bottom: 30px;
+        }
+        .difficulty-option {
+            margin: 15px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        .difficulty-option:hover {
+            transform: scale(1.05);
+        }
+        #difficulty-easy {
+            background-color: #4CAF50;
+        }
+        #difficulty-medium {
+            background-color: #FFC107;
+        }
+        #difficulty-hard {
+            background-color: #F44336;
+        }
+        .instructions {
+            margin-top: 30px;
+            color: #666;
+            text-align: left;
+            max-width: 500px;
+        }
+    </style>
+</head>
+<body>
+    <div id="start-screen">
+        <h1>智能贪吃蛇对战</h1>
+        <p>选择游戏难度：</p>
+        <button id="difficulty-easy" class="difficulty-option">简单</button>
+        <button id="difficulty-medium" class="difficulty-option">中等</button>
+        <button id="difficulty-hard" class="difficulty-option">困难</button>
+        
+        <div class="instructions">
+            <h3>游戏规则：</h3>
+            <ul>
+                <li>使用方向键控制你的蛇</li>
+                <li>吃到食物可以增加长度和分数</li>
+                <li>墙壁可以穿透到另一边</li>
+                <li>不能撞到自己或AI蛇</li>
+                <li>AI蛇会智能追逐食物或干扰你</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div id="game-container">
+        <canvas id="game-canvas" width="600" height="400"></canvas>
+        <div id="score">玩家: 0 | AI: 0</div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

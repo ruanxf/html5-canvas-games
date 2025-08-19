@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>canvas测试demo</title>
+</head>
+<body>
+    <!-- 【canvas】是inline行元素，所特有的属性仅有2个：width(默认300像素) 和 height(默认150像素) -->
+    <canvas style="border: 1px solid #f00" class="test-canvas">
+        <span>如果浏览器不支持canvas，则会显示这个span元素哈<span>
+    </canvas>
+    <script>
+        const canvas = document.querySelector('.test-canvas'); // 获取dom元素
+        const ctx = canvas.getContext('2d'); // 获取canvas上下文
+        console.log(ctx); // 打印看看CanvasRenderingContext2D接口
+
+        ctx.fillStyle = '#f00'; // 设置形状颜色内部为绿色
+        ctx.fillRect(10, 10, 150, 100); // 绘制矩形：fillRect(x, y, width, height)
+
+        const div = document.createElement('div')
+        div.setAttribute('id', 'status');
+        document.body.appendChild(div)
+        div.style.cssText = 'background: #f00; width: 0%; height: 20px;'
+        console.log(div.style);
+        
+        function updateProgress() {
+            div.style.width = (parseInt(div.style.width, 10) + 5) + 'px';
+            if (div.style.width !== '500px') {
+                requestAnimationFrame(updateProgress);
+            }
+        }
+        updateProgress()
+    </script>
+</body>
+</html>

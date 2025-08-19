@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<hebtn-allad>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>画板签名</title>
+    <style>
+        body {
+            height: 100vh;
+        }
+        canvas {
+            border: 2px solid #000;
+            border-radius: 12px;
+            margin: 50px auto 0;
+        }
+        input[name="line-width"] {
+            width: 100px;
+            border: 1px solid;
+        }
+        .btn-all {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background-color: #fff;
+            font-size: 16px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+        }
+        .btn-clear {
+            border: .5px solid #dcdee0;
+        }
+        .btn-ok {
+            background-color: #1989fa;
+            color: #fff;
+        }
+        .btn-downLoad {
+            background-color: #07c160;
+            color: #fff;
+        }
+    </style>
+</hebtn-allad>
+<body>
+    <div style="display: flex;">
+        <canvas width="600" height="400"></canvas>
+    </div>
+
+    <div class="btn-all">
+        <label>调笔粗细：</label><input type="text" name="line-width" id="">
+        <label>调笔色：</label><input type="color" value="#000"/>
+    </div>
+    <div class="btn-all btn-options">
+        <button class="btn btn-clear">清空</button>
+        <button class="btn btn-ok">查看图片</button>
+        <button class="btn btn-downLoad">下载图片</button>
+    </div>
+    <script>
+        // 组件一般会抛出的自选值
+        const props = {
+            lineWidth: 3, // 线的粗细
+            penColor: '#000', // 线的色值
+        }
+        // 调笔的粗细、色值等
+        const lineWidthInput = document.querySelector('input[name="line-width"]');
+        const colorInput = document.querySelector('input[type="color"]');
+        lineWidthInput.addEventListener('input', (e) => {
+            props.lineWidth = e.target.value;
+        })
+        colorInput.addEventListener('input', (e) => {
+            props.penColor = e.target.value;
+        });
+        // canvas画布
+        const canvas = document.querySelector('canvas');
+        // 获取2D上下文（画笔🖌）
+        const ctx = canvas.getContext('2d');
+        console.log(ctx);
+
+        // 初始记录些东西
+        let startPoint = {x: '', y: ''};
+        function drawLine(xStart, yStart, xEnd, yEnd) {
+            ctx.beginPath();
+            ctx.moveTo(xStart, yStart);
+            ctx.lineTo(xEnd, yEnd);
+            ctx.stroke();
+            // ctx.closePath();
+        }
+
+        function getPosition(e) {
+            if (e.type.includes('touch')) {
+                const touch = e.touches[0] || e.changedTouches[0];
+                const rect = canvas.getBoundingClientRect();
+                console.log('touch', touch);
+                console.log('rect', rect);
+                return [touch.clientX - rect.left, touch.clientY - rect.top];
+            } else {
+                return [e.offsetX, e.offsetY]
+            }
+        }
+
+        // 【鼠标按下】记录起始坐标
+        function startDraw(e) {
+            console.log('画笔状态', e);
+            startPoint.x = getPosition(e)[0];
+            startPoint.y = getPosition(e)[1];
+            ctx.lineWidth = props.lineWidth;
+            ctx.strokeStyle = props.penColor;
+        }
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            startDraw(e)
+        });
+
+        // 【鼠标移动】
+        function ingDraw(e) {
+            // console.log(e)
+            if (!startPoint.x) {
+                console.log(1);
+                return
+            };
+            console.log(2);
+            
+            let newPoint = {
+                x: getPosition(e)[0],
+                y: getPosition(e)[1]
+            };
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            drawLine(startPoint.x, startPoint.y, newPoint.x, newPoint.y);
+            startPoint = newPoint;
+            // if (startPoint.x !== '' && startPoint.y !== '') {
+            //     ctx.beginPath();
+            //     ctx.moveTo(startPoint.x, startPoint.y);
+            //     ctx.lineTo(newPoint.x, newPoint.y);
+            //     ctx.stroke();
+            //     startPoint = newPoint;
+            // }
+        }
+        canvas.addEventListener('mousemove', ingDraw);
+        canvas.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+            ingDraw(e);
+        });
+
+        // 【鼠标抬起】
+        function stopDrawing() {
+            startPoint.x = '';
+            startPoint.y = '';
+        }
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('touchEnd', function(e) {
+            e.preventDefault();
+            stopDrawing();
+        });
+        // 【鼠标移出】
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        document.querySelector('.btn-clear').addEventListener('click', function() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        })
+
+        // 【业务功能】查看图片
+        const btnOk = document.querySelector('.btn-ok');
+        btnOk.addEventListener('click', () => {
+            const dataUrl = canvas.toDataURL('image/png');
+            console.log(dataUrl);
+            const lll = document.createElement('div');
+            lll.classList.add('img-con');
+            lll.style.cssText = 'display: flex; justify-content: center; margin-top: 20px;';
+            lll.innerHTML = `
+                <div style="width: 150px; border: 1px solid green;">
+                    <img style="width: 100%;" src="${dataUrl}"/>
+                </div>
+            `;
+            document.querySelector('.btn-options').after(lll)
+        })
+
+        // 【业务功能】下载图片
+        document.querySelector('.btn-downLoad').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = '签名_' + new Date().toISOString().slice(0, 10) + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        })
+    </script>
+</html>

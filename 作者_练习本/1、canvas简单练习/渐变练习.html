@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>canvas测试demo</title>
+</head>
+<body>
+    <script>
+        const canvas = document.createElement('canvas');
+        canvas.width = 600;
+        canvas.height = 600;
+        canvas.style.cssText = 'border: 1px solid #f00';
+        document.body.append(canvas);
+        const ctx = canvas.getContext('2d'); // 获取canvas上下文
+        console.log(ctx); // 打印看看CanvasRenderingContext2D接口
+
+        ctx.fillStyle = '#f00'; // 设置形状颜色内部为绿色
+        ctx.fillRect(10, 10, 150, 100); // 绘制矩形：fillRect(x, y, width, height)
+
+        ctx.beginPath();
+        ctx.moveTo(200, 200);
+        ctx.lineTo(300, 250);
+        const grad = ctx.createLinearGradient(200, 200, 300, 250)
+        grad.addColorStop(0, '#f00');
+        grad.addColorStop(0.5, 'pink');
+        grad.addColorStop(1, '#4e6ef2');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 20
+        ctx.stroke();
+
+
+        ctx.fillStyle = '#eee'
+        ctx.fillRect(400, 400, 100, 120)
+
+        const div = document.createElement('div')
+        div.setAttribute('id', 'status');
+        document.body.appendChild(div)
+        div.style.cssText = 'background: #f00; width: 0%; height: 20px;'
+        console.log(div.style);
+        
+        function updateProgress() {
+            div.style.width = (parseInt(div.style.width, 10) + 50) + 'px';
+            if (div.style.width !== '500px') {
+                requestAnimationFrame(updateProgress);
+            }
+        }
+        updateProgress()
+    </script>
+</body>
+</html>

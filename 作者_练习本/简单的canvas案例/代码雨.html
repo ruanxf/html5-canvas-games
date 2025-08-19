@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script>
+        document.querySelector('body').style.cssText = 'margin: 0;';
+        const canvas = document.createElement('canvas');
+        const width = canvas.width = window.innerWidth;
+        const height = canvas.height = window.innerHeight;
+        const ctx = canvas.getContext('2d');
+        document.body.append(canvas);
+
+        const arr = Array(Math.ceil(width / 10)).fill(0);
+        const str = '01';
+        ctx.font = '10px';
+        function rain() {
+            // 背景
+            ctx.fillStyle = 'rgba(0, 0, 20, .05)';
+            ctx.fillRect(0, 0, width, height);  
+
+            ctx.fillStyle = "#00c8aa";
+            arr.forEach(function(value, index) {
+                ctx.fillText(str[Math.floor(Math.random() * str.length)], index * 10, value + 10);
+                arr[index] = value >= height || value > 8888 * Math.random() ? 0 : value + 10;
+            })
+        }
+        setInterval(rain, 30);
+    </script>
+</body>
+</html>

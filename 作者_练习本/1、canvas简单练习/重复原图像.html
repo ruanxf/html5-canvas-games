@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <canvas id="CreatePatternSample1" width=600 height=210> </canvas>
+    <script>
+        var context = document.getElementById('CreatePatternSample1').getContext('2d');
+        // create an Image object from the grayhorse.jpg file
+        var horseImage = new Image();
+        horseImage.src = './image/grayhorse.jpg';
+        horseImage.onload = function() {
+            // create a CanvasPattern object with this image and make that the new fillStyle value
+            var horsePattern = context.createPattern(horseImage, 'repeat');
+            context.fillStyle = horsePattern;
+            // Now draw same objects: first a rectangle
+            context.fillRect(0, 0, 200, 210);
+            // then a triangle
+            context.beginPath();
+            context.moveTo(220, 0);
+            context.lineTo(220, 100);
+            context.lineTo(550, 50);
+            context.lineTo(220, 0);
+            context.fill();
+            context.closePath();
+            // and finally write "Hello!" 
+            context.font = '120px sans-serif';
+            context.fillText('Hello!', 210, 200);
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台球游戏 🎱</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: linear-gradient(to bottom, #1a2a6c, #b21f1f, #fdbb2d);
+            font-family: Arial, sans-serif;
+            color: white;
+            min-height: 100vh;
+        }
+
+        h1 {
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            margin-bottom: 10px;
+        }
+
+        .game-container {
+            position: relative;
+            margin: 20px 0;
+        }
+
+        canvas {
+            background-color: #0a5c36;
+            border: 10px solid #5d4037;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            width: 800px;
+            max-width: 100%;
+        }
+
+        button {
+            padding: 8px 15px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        .power-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #powerSlider {
+            width: 150px;
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            width: 800px;
+            max-width: 100%;
+            margin-bottom: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 15px;
+            border-radius: 10px;
+        }
+
+        .instructions {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 10px;
+            width: 800px;
+            max-width: 100%;
+        }
+
+        .cue {
+            position: absolute;
+            pointer-events: none;
+            transform-origin: left center;
+        }
+
+        #playerTurn {
+            font-weight: bold;
+            color: #FFD700;
+        }
+    </style>
+</head>
+<body>
+    <h1>台球游戏 🎱</h1>
+
+    <div class="game-info">
+        <div>玩家1得分: <span id="player1Score">0</span></div>
+        <div>玩家2得分: <span id="player2Score">0</span></div>
+        <div>当前回合: <span id="playerTurn">玩家1</span></div>
+        <div>游戏状态: <span id="gameState">准备中</span></div>
+    </div>
+
+    <div class="game-container">
+        <canvas id="poolTable" width="800" height="400"></canvas>
+    </div>
+
+    <div class="controls">
+        <div class="power-container">
+            <label for="powerSlider">击球力度:</label>
+            <input type="range" id="powerSlider" min="1" max="100" value="50">
+            <span id="powerValue">50</span>
+        </div>
+
+        <button id="shootBtn">击球</button>
+        <button id="newGameBtn">新游戏</button>
+        <button id="toggleGuideBtn">显示/隐藏辅助线</button>
+        <button id="changeViewBtn">切换视角</button>
+    </div>
+
+    <div class="instructions">
+        <h3>游戏说明:</h3>
+        <ul>
+            <li>使用鼠标移动来瞄准白球</li>
+            <li>调整力度滑块控制击球力量</li>
+            <li>点击"击球"按钮或按空格键击球</li>
+            <li>玩家1需要击打单色球(1-7号)，玩家2击打花色球(9-15号)</li>
+            <li>8号球需要在最后击打</li>
+            <li>犯规会将白球交给对手</li>
+        </ul>
+    </div>
+
+    <script>
+        // 游戏常量
+        const BALL_RADIUS = 15;
+        const WHITE_BALL_START = { x: 200, y: 200 };
+        const POCKET_RADIUS = 20;
+        const FRICTION = 0.98;
+        const MIN_VELOCITY = 0.1;
+        const MAX_POWER = 10;
+
+        // 游戏状态
+        let gameState = {
+            balls: [],
+            pockets: [],
+            cueBall: null,
+            player1Score: 0,
+            player2Score: 0,
+            currentPlayer: 1,
+            gamePhase: 'placing', // placing, aiming, moving, gameOver
+            player1Type: 'solids', // solids or stripes
+            player2Type: 'stripes',
+            firstCollision: null,
+            foul: false,
+            guideVisible: true,
+            topDownView: true,
+            lastPocketed: null
+        };
+
+        // DOM元素
+        const canvas = document.getElementById('poolTable');
+        const ctx = canvas.getContext('2d');
+        const powerSlider = document.getElementById('powerSlider');
+        const powerValue = document.getElementById('powerValue');
+        const shootBtn = document.getElementById('shootBtn');
+        const newGameBtn = document.getElementById('newGameBtn');
+        const toggleGuideBtn = document.getElementById('toggleGuideBtn');
+        const changeViewBtn = document.getElementById('changeViewBtn');
+        const player1ScoreEl = document.getElementById('player1Score');
+        const player2ScoreEl = document.getElementById('player2Score');
+        const playerTurnEl = document.getElementById('playerTurn');
+        const gameStateEl = document.getElementById('gameState');
+
+        // 初始化游戏
+        function initGame() {
+            // 清除现有状态
+            gameState.balls = [];
+            gameState.pockets = [];
+            gameState.player1Score = 0;
+            gameState.player2Score = 0;
+            gameState.currentPlayer = 1;
+            gameState.gamePhase = 'placing';
+            gameState.player1Type = 'solids';
+            gameState.player2Type = 'stripes';
+            gameState.firstCollision = null;
+            gameState.foul = false;
+            gameState.lastPocketed = null;
+
+            updateScoreDisplay();
+            playerTurnEl.textContent = '玩家1';
+            gameStateEl.textContent = '放置白球';
+
+            // 创建球袋
+            createPockets();
+
+            // 创建白球
+            gameState.cueBall = {
+                x: WHITE_BALL_START.x,
+                y: WHITE_BALL_START.y,
+                vx: 0,
+                vy: 0,
+                radius: BALL_RADIUS,
+                color: 'white',
+                number: 0,
+                type: 'cue'
+            };
+
+            // 创建其他球
+            createBalls();
+
+            // 绘制初始状态
+            draw();
+        }
+
+        // 创建球袋
+        function createPockets() {
+            const margin = 20;
+            const width = canvas.width - margin * 2;
+            const height = canvas.height - margin * 2;
+
+            // 六个球袋位置
+            gameState.pockets = [
+                { x: margin, y: margin }, // 左上
+                { x: canvas.width / 2, y: margin - 5 }, // 中上
+                { x: canvas.width - margin, y: margin }, // 右上
+                { x: margin, y: canvas.height - margin }, // 左下
+                { x: canvas.width / 2, y: canvas.height - margin + 5 }, // 中下
+                { x: canvas.width - margin, y: canvas.height - margin } // 右下
+            ];
+        }
+
+        // 创建所有球
+        function createBalls() {
+            // 重置球数组
+            gameState.balls = [];
+
+            // 三角形排列的球
+            const startX = canvas.width - 150;
+            const startY = canvas.height / 2;
+
+            // 8号球在中心
+            const ball8 = {
+                x: startX,
+                y: startY,
+                vx: 0,
+                vy: 0,
+                radius: BALL_RADIUS,
+                color: 'black',
+                number: 8,
+                type: 'eight'
+            };
+            gameState.balls.push(ball8);
+
+            // 其他球的排列
+            const ballNumbers = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15];
+            const positions = [
+                { row: 0, col: 0 }, // 第一排
+                { row: 1, col: -0.5 }, { row: 1, col: 0.5 }, // 第二排
+                { row: 2, col: -1 }, { row: 2, col: 0 }, { row: 2, col: 1 }, // 第三排
+                { row: 3, col: -1.5 }, { row: 3, col: -0.5 }, { row: 3, col: 0.5 }, { row: 3, col: 1.5 }, // 第四排
+                { row: 4, col: -2 }, { row: 4, col: -1 }, { row: 4, col: 0 }, { row: 4, col: 1 }, { row: 4, col: 2 } // 第五排
+            ];
+
+            const spacing = BALL_RADIUS * 2.1;
+
+            for (let i = 0; i < positions.length; i++) {
+                const pos = positions[i];
+                const ballNum = ballNumbers[i];
+
+                const ball = {
+                    x: startX + pos.row * spacing * Math.sin(Math.PI/3),
+                    y: startY + pos.col * spacing,
+                    vx: 0,
+                    vy: 0,
+                    radius: BALL_RADIUS,
+                    color: getBallColor(ballNum),
+                    number: ballNum,
+                    type: ballNum < 8 ? 'solid' : (ballNum === 8 ? 'eight' : 'stripe')
+                };
+
+                gameState.balls.push(ball);
+            }
+        }
+
+        // 获取球的颜色
+        function getBallColor(number) {
+            const colors = {
+                1: 'yellow',
+                2: 'blue',
+                3: 'red',
+                4: 'purple',
+                5: 'orange',
+                6: 'green',
+                7: 'maroon',
+                8: 'black',
+                9: 'yellow',
+                10: 'blue',
+                11: 'red',
+                12: 'purple',
+                13: 'orange',
+                14: 'green',
+                15: 'maroon'
+            };
+
+            return colors[number] || 'white';
+        }
+
+        // 绘制游戏
+        function draw() {
+            // 清除画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制台球桌
+            drawTable();
+
+            // 绘制球袋
+            drawPockets();
+
+            // 绘制所有球
+            drawBalls();
+
+            // 如果是在瞄准阶段，绘制辅助线
+            if (gameState.gamePhase === 'aiming' && gameState.guideVisible) {
+                drawAimGuide();
+            }
+
+            // 如果是放置白球阶段，绘制放置区域
+            if (gameState.gamePhase === 'placing') {
+                drawPlacementArea();
+            }
+
+            // 如果是俯视图，绘制球杆
+            if (gameState.topDownView && (gameState.gamePhase === 'aiming' || gameState.gamePhase === 'placing')) {
+                drawCue();
+            }
+        }
+
+        // 绘制台球桌
+        function drawTable() {
+            // 桌面
+            ctx.fillStyle = '#0a5c36';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 边框
+            ctx.strokeStyle = '#5d4037';
+            ctx.lineWidth = 10;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+            // 标记点
+            ctx.fillStyle = 'white';
+
+            // 开球线点
+            const spotX = canvas.width / 4;
+            const spotY = canvas.height / 2;
+            ctx.beginPath();
+            ctx.arc(spotX, spotY, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 中央点
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height / 2, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 脚点
+            const footSpotX = canvas.width * 3/4;
+            ctx.beginPath();
+            ctx.arc(footSpotX, canvas.height / 2, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 绘制球袋
+        function drawPockets() {
+            ctx.fillStyle = 'black';
+            gameState.pockets.forEach(pocket => {
+                ctx.beginPath();
+                ctx.arc(pocket.x, pocket.y, POCKET_RADIUS, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // 绘制所有球
+        function drawBalls() {
+            // 绘制其他球
+            gameState.balls.forEach(ball => {
+                drawBall(ball);
+            });
+
+            // 绘制白球
+            if (gameState.cueBall) {
+                drawBall(gameState.cueBall);
+            }
+        }
+
+        // 绘制单个球
+        function drawBall(ball) {
+    // 验证参数
+    const x = Number.isFinite(ball.x) ? ball.x : 0;
+    const y = Number.isFinite(ball.y) ? ball.y : 0;
+    const radius = Math.max(1, Number.isFinite(ball.radius) ? ball.radius : 15);
+
+    // 绘制阴影
+    if (gameState.topDownView) {
+        ctx.beginPath();
+        ctx.arc(x, y, radius * 1.1, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.fill();
+    }
+
+    // 绘制球体
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+
+    // 创建渐变
+    try {
+        const x0 = x - radius/3;
+        const y0 = y - radius/3;
+        const r0 = radius/4;
+
+        if (Number.isFinite(x0) && Number.isFinite(y0) && Number.isFinite(r0)) {
+            const gradient = ctx.createRadialGradient(x0, y0, r0, x, y, radius);
+
+            if (ball.color === 'white') {
+                gradient.addColorStop(0, '#ffffff');
+                gradient.addColorStop(1, '#dddddd');
+            } else if (ball.color === 'black') {
+                gradient.addColorStop(0, '#666666');
+                gradient.addColorStop(1, '#000000');
+            } else {
+                gradient.addColorStop(0, 'white');
+                gradient.addColorStop(0.7, ball.color);
+                gradient.addColorStop(1, shadeColor(ball.color, -40));
+            }
+
+            ctx.fillStyle = gradient;
+        } else {
+            ctx.fillStyle = ball.color;
+        }
+    } catch (e) {
+        console.warn('创建渐变失败:', e);
+        ctx.fillStyle = ball.color;
+    }
+
+    ctx.fill();
+
+            // 绘制球号
+            if (ball.number > 0) {
+                ctx.fillStyle = ball.number === 8 ? 'white' : (ball.type === 'stripe' ? 'black' : 'white');
+                ctx.font = `${ball.radius * 0.8}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(ball.number.toString(), ball.x, ball.y);
+            }
+        }
+
+        // 绘制瞄准辅助线
+        function drawAimGuide() {
+            if (!gameState.cueBall) return;
+
+            const mousePos = getMousePos(canvas, gameState.lastMousePos);
+            if (!mousePos) return;
+
+            const dx = mousePos.x - gameState.cueBall.x;
+            const dy = mousePos.y - gameState.cueBall.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+
+            // 辅助线
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(gameState.cueBall.x, gameState.cueBall.y);
+
+            // 延长线
+            const lineLength = Math.max(canvas.width, canvas.height);
+            ctx.lineTo(
+                gameState.cueBall.x - Math.cos(angle) * lineLength,
+                gameState.cueBall.y - Math.sin(angle) * lineLength
+            );
+            ctx.stroke();
+
+            // 力度指示器
+            const power = powerSlider.value / 100 * MAX_POWER;
+            const powerLength = power * 10;
+
+            ctx.strokeStyle = `rgba(255, ${255 - power * 25}, 0, 0.8)`;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(gameState.cueBall.x, gameState.cueBall.y);
+            ctx.lineTo(
+                gameState.cueBall.x - Math.cos(angle) * powerLength,
+                gameState.cueBall.y - Math.sin(angle) * powerLength
+            );
+            ctx.stroke();
+        }
+
+        // 绘制放置区域
+        function drawPlacementArea() {
+            const headSpotX = canvas.width / 4;
+            const headSpotY = canvas.height / 2;
+            const radius = canvas.width / 8;
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(headSpotX, headSpotY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fill();
+
+            ctx.fillStyle = 'white';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('在此区域内放置白球', headSpotX, headSpotY + radius + 20);
+        }
+
+        // 绘制球杆
+        function drawCue() {
+            if (!gameState.cueBall || !gameState.lastMousePos) return;
+
+            const mousePos = getMousePos(canvas, gameState.lastMousePos);
+            if (!mousePos) return;
+
+            const dx = mousePos.x - gameState.cueBall.x;
+            const dy = mousePos.y - gameState.cueBall.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+
+            const cueLength = 200;
+            const cueWidth = 5;
+            const tipOffset = 30; // 球杆尖端与球的距离
+
+            ctx.save();
+            ctx.translate(gameState.cueBall.x, gameState.cueBall.y);
+            ctx.rotate(angle);
+
+            // 球杆渐变
+            const gradient = ctx.createLinearGradient(-cueLength, -cueWidth/2, -cueLength + 50, cueWidth/2);
+            gradient.addColorStop(0, '#5d4037');
+            gradient.addColorStop(0.5, '#8d6e63');
+            gradient.addColorStop(1, '#5d4037');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(-cueLength - tipOffset, -cueWidth/2, cueLength, cueWidth);
+
+            // 球杆尖端
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-tipOffset, -cueWidth/2, tipOffset, cueWidth);
+
+            ctx.restore();
+        }
+
+       // 颜色辅助函数
+function shadeColor(color, percent) {
+    let R = parseInt(color.substring(1,3), 16);
+    let G = parseInt(color.substring(3,5), 16);
+    let B = parseInt(color.substring(5,7), 16);
+
+    R = parseInt(R * (100 + percent) / 100);
+    G = parseInt(G * (100 + percent) / 100);
+    B = parseInt(B * (100 + percent) / 100);
+
+    R = (R<255)?R:255;  
+    G = (G<255)?G:255;  
+    B = (B<255)?B:255;  
+
+    // 修正：为每个toString()添加闭合括号
+    const RR = ((R.toString(16).length===1)?"0"+R.toString(16):R.toString(16));
+    const GG = ((G.toString(16).length===1)?"0"+G.toString(16):G.toString(16));
+    const BB = ((B.toString(16).length===1)?"0"+B.toString(16):B.toString(16));
+
+    return "#"+RR+GG+BB;
+}
+
+        // 游戏循环
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 更新游戏状态
+        function update() {
+            // 如果球在移动，更新位置
+            if (gameState.gamePhase === 'moving') {
+                let allStopped = true;
+
+                // 更新白球位置
+                if (gameState.cueBall) {
+                    updateBallPosition(gameState.cueBall);
+                    if (gameState.cueBall.vx !== 0 || gameState.cueBall.vy !== 0) {
+                        allStopped = false;
+                    }
+                }
+
+                // 更新其他球位置
+                gameState.balls.forEach(ball => {
+                    updateBallPosition(ball);
+                    if (ball.vx !== 0 || ball.vy !== 0) {
+                        allStopped = false;
+                    }
+                });
+
+                // 检测碰撞
+                detectCollisions();
+
+                // 检测球袋
+                detectPockets();
+
+                // 如果所有球都停止了
+                if (allStopped) {
+                    endTurn();
+                }
+            }
+        }
+
+        // 更新球的位置
+        function updateBallPosition(ball) {
+            // 应用摩擦力
+            ball.vx *= FRICTION;
+            ball.vy *= FRICTION;
+
+            // 如果速度很小，设为0
+            if (Math.abs(ball.vx) < MIN_VELOCITY) ball.vx = 0;
+            if (Math.abs(ball.vy) < MIN_VELOCITY) ball.vy = 0;
+
+            // 更新位置
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // 边界检测
+            const margin = BALL_RADIUS;
+
+            // 左边界
+            if (ball.x < margin) {
+                ball.x = margin;
+                ball.vx *= -0.8; // 反弹
+            }
+
+            // 右边界
+            if (ball.x > canvas.width - margin) {
+                ball.x = canvas.width - margin;
+                ball.vx *= -0.8; // 反弹
+            }
+
+            // 上边界
+            if (ball.y < margin) {
+                ball.y = margin;
+                ball.vy *= -0.8; // 反弹
+            }
+
+            // 下边界
+            if (ball.y > canvas.height - margin) {
+                ball.y = canvas.height - margin;
+                ball.vy *= -0.8; // 反弹
+            }
+        }
+
+        // 检测碰撞
+        function detectCollisions() {
+            // 球与球的碰撞
+            for (let i = 0; i < gameState.balls.length; i++) {
+                for (let j = i + 1; j < gameState.balls.length; j++) {
+                    checkBallCollision(gameState.balls[i], gameState.balls[j]);
+                }
+
+                if (gameState.cueBall) {
+                    checkBallCollision(gameState.balls[i], gameState.cueBall);
+                }
+            }
+        }
+
+        // 检测两个球之间的碰撞
+        function checkBallCollision(ball1, ball2) {
+            const dx = ball2.x - ball1.x;
+            const dy = ball2.y - ball1.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // 如果距离小于两球半径之和，发生碰撞
+            if (distance < ball1.radius + ball2.radius) {
+                // 记录第一次碰撞
+                if (gameState.firstCollision === null && gameState.cueBall) {
+                    if (ball1 === gameState.cueBall || ball2 === gameState.cueBall) {
+                        const otherBall = ball1 === gameState.cueBall ? ball2 : ball1;
+                        gameState.firstCollision = otherBall;
+                    }
+                }
+
+                // 计算碰撞角度
+                const angle = Math.atan2(dy, dx);
+
+                // 计算速度分量
+                const sin = Math.sin(angle);
+                const cos = Math.cos(angle);
+
+                // 旋转坐标系
+                const x1 = 0;
+                const y1 = 0;
+                const x2 = dx * cos + dy * sin;
+                const y2 = dy * cos - dx * sin;
+
+                // 旋转速度向量
+                const vx1 = ball1.vx * cos + ball1.vy * sin;
+                const vy1 = ball1.vy * cos - ball1.vx * sin;
+                const vx2 = ball2.vx * cos + ball2.vy * sin;
+                const vy2 = ball2.vy * cos - ball2.vx * sin;
+
+                // 碰撞后的速度 (1D弹性碰撞)
+                const vx1Final = ((ball1.radius - ball2.radius) * vx1 + 2 * ball2.radius * vx2) / (ball1.radius + ball2.radius);
+                const vx2Final = ((ball2.radius - ball1.radius) * vx2 + 2 * ball1.radius * vx1) / (ball1.radius + ball2.radius);
+
+                // 防止球重叠
+                const overlap = (ball1.radius + ball2.radius) - distance;
+                const moveX = overlap * cos / 2;
+                const moveY = overlap * sin / 2;
+
+                ball1.x -= moveX;
+                ball1.y -= moveY;
+                ball2.x += moveX;
+                ball2.y += moveY;
+
+                // 更新速度
+                ball1.vx = vx1Final * cos - vy1 * sin;
+                ball1.vy = vy1 * cos + vx1Final * sin;
+                ball2.vx = vx2Final * cos - vy2 * sin;
+                ball2.vy = vy2 * cos + vx2Final * sin;
+            }
+        }
+
+        // 检测球袋
+        function detectPockets() {
+            // 检查白球是否进袋
+            if (gameState.cueBall) {
+                for (const pocket of gameState.pockets) {
+                    const dx = pocket.x - gameState.cueBall.x;
+                    const dy = pocket.y - gameState.cueBall.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < POCKET_RADIUS) {
+                        // 白球进袋
+                        handleCueBallPocketed();
+                        return;
+                    }
+                }
+            }
+
+            // 检查其他球是否进袋
+            for (let i = gameState.balls.length - 1; i >= 0; i--) {
+                const ball = gameState.balls[i];
+
+                for (const pocket of gameState.pockets) {
+                    const dx = pocket.x - ball.x;
+                    const dy = pocket.y - ball.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < POCKET_RADIUS) {
+                        // 球进袋
+                        handleBallPocketed(ball, i);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 处理白球进袋
+        function handleCueBallPocketed() {
+            gameState.foul = true;
+            gameState.lastPocketed = gameState.cueBall;
+            gameState.cueBall = null;
+
+            // 如果游戏刚开始，重新放置白球
+            if (gameState.gamePhase === 'moving') {
+                gameState.gamePhase = 'placing';
+                gameStateEl.textContent = '放置白球 (犯规)';
+            }
+        }
+
+        // 处理其他球进袋
+        function handleBallPocketed(ball, index) {
+            gameState.lastPocketed = ball;
+
+            // 从游戏中移除球
+            gameState.balls.splice(index, 1);
+
+            // 如果是8号球
+            if (ball.number === 8) {
+                // 检查是否合法击打
+                const currentPlayerType = gameState.currentPlayer === 1 ? gameState.player1Type : gameState.player2Type;
+                const allPlayerBallsPocketed = gameState.balls.every(b => 
+                    b.type !== currentPlayerType && b.type !== 'eight'
+                );
+
+                if (allPlayerBallsPocketed) {
+                    // 合法击打8号球，当前玩家获胜
+                    gameState.gamePhase = 'gameOver';
+                    gameStateEl.textContent = `玩家${gameState.currentPlayer}获胜!`;
+                    alert(`玩家${gameState.currentPlayer}获胜!`);
+                } else {
+                    // 非法击打8号球，对手获胜
+                    gameState.foul = true;
+                    gameState.gamePhase = 'gameOver';
+                    const winner = gameState.currentPlayer === 1 ? 2 : 1;
+                    gameStateEl.textContent = `玩家${winner}获胜!`;
+                    alert(`非法击打8号球! 玩家${winner}获胜!`);
+                }
+                return;
+            }
+
+            // 更新分数
+            if (gameState.currentPlayer === 1) {
+                gameState.player1Score += ball.number;
+            } else {
+                gameState.player2Score += ball.number;
+            }
+
+            updateScoreDisplay();
+
+            // 检查是否是玩家的球
+            const currentPlayerType = gameState.currentPlayer === 1 ? gameState.player1Type : gameState.player2Type;
+            const opponentType = gameState.currentPlayer === 1 ? gameState.player2Type : gameState.player1Type;
+
+            if (ball.type === currentPlayerType) {
+                // 玩家击打自己的球，合法
+                gameState.foul = false;
+            } else if (ball.type === opponentType) {
+                // 玩家击打对手的球，犯规
+                gameState.foul = true;
+            }
+
+            // 如果是游戏刚开始，确定玩家球类型
+            if (gameState.player1Type === 'solids' && gameState.player2Type === 'stripes') {
+                if (ball.type === 'solid') {
+                    gameState.player1Type = 'solids';
+                    gameState.player2Type = 'stripes';
+                } else if (ball.type === 'stripe') {
+                    gameState.player1Type = 'stripes';
+                    gameState.player2Type = 'solids';
+                }
+            }
+        }
+
+        // 结束当前回合
+        function endTurn() {
+            gameState.gamePhase = 'aiming';
+            gameStateEl.textContent = '瞄准中';
+
+            // 检查犯规
+            if (gameState.foul) {
+                // 切换玩家
+                gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+                playerTurnEl.textContent = `玩家${gameState.currentPlayer} (犯规)`;
+
+                // 如果白球进袋，需要放置
+                if (!gameState.cueBall) {
+                    gameState.gamePhase = 'placing';
+                    gameStateEl.textContent = '放置白球 (犯规)';
+                }
+            } else {
+                // 检查是否有合法进球
+                if (gameState.lastPocketed && 
+                    ((gameState.currentPlayer === 1 && gameState.lastPocketed.type === gameState.player1Type) || 
+                     (gameState.currentPlayer === 2 && gameState.lastPocketed.type === gameState.player2Type))) {
+                    // 玩家继续击球
+                    playerTurnEl.textContent = `玩家${gameState.currentPlayer} (继续)`;
+                } else {
+                    // 切换玩家
+                    gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+                    playerTurnEl.textContent = `玩家${gameState.currentPlayer}`;
+                }
+            }
+
+            // 重置状态
+            gameState.firstCollision = null;
+            gameState.foul = false;
+            gameState.lastPocketed = null;
+        }
+
+        // 击球
+        function shoot() {
+            if (gameState.gamePhase !== 'aiming' || !gameState.cueBall || !gameState.lastMousePos) return;
+
+            const mousePos = getMousePos(canvas, gameState.lastMousePos);
+            if (!mousePos) return;
+
+            const dx = gameState.cueBall.x - mousePos.x;
+            const dy = gameState.cueBall.y - mousePos.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // 计算力度
+            const power = powerSlider.value / 100 * MAX_POWER;
+
+            // 设置白球速度
+            gameState.cueBall.vx = (dx / distance) * power;
+            gameState.cueBall.vy = (dy / distance) * power;
+
+            // 更新游戏状态
+            gameState.gamePhase = 'moving';
+            gameStateEl.textContent = '球移动中';
+        }
+
+        // 放置白球
+        function placeCueBall(x, y) {
+            if (gameState.gamePhase !== 'placing') return;
+
+            // 检查是否在放置区域内
+            const headSpotX = canvas.width / 4;
+            const headSpotY = canvas.height / 2;
+            const radius = canvas.width / 8;
+
+            const dx = x - headSpotX;
+            const dy = y - headSpotY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > radius) return;
+
+            // 放置白球
+            if (!gameState.cueBall) {
+                gameState.cueBall = {
+                    x: x,
+                    y: y,
+                    vx: 0,
+                    vy: 0,
+                    radius: BALL_RADIUS,
+                    color: 'white',
+                    number: 0,
+                    type: 'cue'
+                };
+            } else {
+                gameState.cueBall.x = x;
+                gameState.cueBall.y = y;
+                gameState.cueBall.vx = 0;
+                gameState.cueBall.vy = 0;
+            }
+
+            // 更新游戏状态
+            gameState.gamePhase = 'aiming';
+            gameStateEl.textContent = '瞄准中';
+        }
+
+        // 更新分数显示
+        function updateScoreDisplay() {
+            player1ScoreEl.textContent = gameState.player1Score;
+            player2ScoreEl.textContent = gameState.player2Score;
+        }
+
+        // 获取鼠标位置
+        function getMousePos(canvas, evt) {
+            if (!evt) return null;
+
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top
+            };
+        }
+
+        // 事件监听器
+        canvas.addEventListener('mousemove', (e) => {
+            gameState.lastMousePos = e;
+        });
+
+        canvas.addEventListener('click', (e) => {
+            const mousePos = getMousePos(canvas, e);
+            if (!mousePos) return;
+
+            if (gameState.gamePhase === 'placing') {
+                placeCueBall(mousePos.x, mousePos.y);
+            }
+        });
+
+        shootBtn.addEventListener('click', shoot);
+
+        newGameBtn.addEventListener('click', initGame);
+
+        toggleGuideBtn.addEventListener('click', () => {
+            gameState.guideVisible = !gameState.guideVisible;
+        });
+
+        changeViewBtn.addEventListener('click', () => {
+            gameState.topDownView = !gameState.topDownView;
+        });
+
+        powerSlider.addEventListener('input', () => {
+            powerValue.textContent = powerSlider.value;
+        });
+
+        // 键盘控制
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && gameState.gamePhase === 'aiming') {
+                shoot();
+                e.preventDefault();
+            }
+        });
+
+        // 初始化游戏并开始游戏循环
+        initGame();
+        gameLoop();
+    </script>
+</body>
+</html>
