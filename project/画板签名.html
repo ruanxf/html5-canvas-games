@@ -95,7 +95,7 @@
             ctx.stroke();
         }
 
-        // -----公共方法：计算鼠标/手指当前 相对于canvas元素的坐标-----
+        // -----公共方法：计算鼠标/手指按下移动时， 相对于canvas元素的坐标-----
         function getPosition(e) {
             // 移动端的事件里没有offsetX 和 offsetY
             // 所以得 touch.clientX(当前手指坐标距离屏幕的距离) - rect.left（canvas元素距离屏幕的距离） = 当前手指坐标到canvas元素的坐标
