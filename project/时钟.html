@@ -23,13 +23,30 @@
         function animate() {
             const date = new Date();
             const hours = date.getHours();
+            const hr = hours > 12 ? hours - 12 : hours; // 钟表的时针是12点制 非24点制。
             const minutes = date.getMinutes();
             const seconds = date.getSeconds();
 
             const ctx = document.querySelector('canvas').getContext('2d');
-            
+
+            // 动画要清空之前的画面。用的requestAnimationFrame动画，类似setInterval但不会存在精确度问题。
+            ctx.clearRect(0, 0, 600, 600);
+            // 【通用的样式】放在save外层。因为save+restore内部用的是 非通用的（当然你也可以覆盖通用的）
+            ctx.strokeStyle = "#000";
+            ctx.lineCap = "round"; 
+
+            // 简单的画线函数
             function drawLine(xStart, yStart, xEnd, yEnd) {
+                ctx.beginPath();
+                ctx.moveTo(xStart, yStart);
+                ctx.lineTo(xEnd, yEnd);
+                ctx.stroke();
+            }
+
+            // 画个辅助线，方便看清楚
+            const drawDashLine = (xStart, yStart, xEnd, yEnd) => {
                 ctx.save();
+                ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.moveTo(xStart, yStart);
                 ctx.lineTo(xEnd, yEnd);
@@ -37,80 +54,61 @@
                 ctx.setLineDash([15, 10]);
                 ctx.stroke();
                 ctx.restore();
-            }
-            drawLine(0, 300, 600, 300)
-            drawLine(300, 0, 300, 600)
+            };
+            drawDashLine(0, 300, 600, 300);
+            drawDashLine(300, 0, 300, 600);
 
+            // 保存状态（让原点坐标变更所影响的范围，仅在save+restore内部）。
             ctx.save();
-            ctx.clearRect(0, 0, 600, 600);
-            ctx.translate(300, 300);
-
-            ctx.strokeStyle = "#000";
-            ctx.lineWidth = 5;
-            ctx.lineCap = "round"; 
-            ctx.rotate(-Math.PI / 2);
+            ctx.translate(300, 300); // 原点坐标变更
+            ctx.rotate(-Math.PI / 2); // 所有指针旋转-90°，3点钟方向 => 对准12点钟方向
 
             // 画时针刻度
-            ctx.save();
-            for (let i = 1; i <= 12; i++) {
+            ctx.lineWidth = 9;
+            for (let i = 0; i < 12; i++) {
                 ctx.beginPath();
-                ctx.rotate(Math.PI / 6);
                 ctx.moveTo(100, 0);
                 ctx.lineTo(120, 0);
+                ctx.rotate(Math.PI / 6); // 依次旋转30°，12*30° = 360°
                 ctx.stroke();
             }
-            ctx.restore();
 
-            // 画分/秒针刻度
-            ctx.save();
+            // 画分针&秒针的刻度
             ctx.lineWidth = 2;
             for (let i = 1; i <= 60; i++) {
                 ctx.beginPath();
-                ctx.rotate(Math.PI / 30);
                 ctx.moveTo(110, 0);
                 ctx.lineTo(120, 0);
+                ctx.rotate(Math.PI / 30); // 依次旋转6°，6*60° = 360°
                 ctx.stroke();
             }
-            ctx.restore();
             
-            // 时针
-            const hr = hours > 12 ? hours - 12 : hours;
+            // 时针（需加save+restore，否则分/秒针将在时针旋转的基础上 旋转，而我们应该让其旋转从12点钟开始）
             ctx.save();
-            ctx.rotate((Math.PI / 6) * hr + (Math.PI / 360) * minutes + (Math.PI / 21600) * seconds);
             ctx.lineWidth = 14;
-            ctx.beginPath();
-            ctx.moveTo(-20, 0);
-            ctx.lineTo(80, 0);
-            ctx.stroke();
+            ctx.rotate((Math.PI / 6) * hr + (Math.PI / 360) * minutes + (Math.PI / 21600) * seconds);
+            drawLine(-20, 0, 80, 0);
             ctx.restore();
 
             // 分针
             ctx.save();
-            ctx.rotate((Math.PI / 30) * minutes + (Math.PI / 1800) * seconds);
             ctx.lineWidth = 10;
-            ctx.beginPath();
-            ctx.moveTo(-28, 0);
-            ctx.lineTo(105, 0);
-            ctx.stroke();
+            ctx.rotate((Math.PI / 30) * minutes + (Math.PI / 1800) * seconds);
+            drawLine(-28, 0, 105, 0);
             ctx.restore();
-
 
             // 秒针
             ctx.save();
-            ctx.rotate((Math.PI / 30) * seconds);
             ctx.lineWidth = 6;
+            ctx.rotate((Math.PI / 30) * seconds); // 6°/秒   360°/60秒
             ctx.strokeStyle = '#f00';
-            ctx.fillStyle = '#f00'
-            ctx.beginPath();
-            ctx.moveTo(-30, 0);
-            ctx.lineTo(110, 0);
-            ctx.stroke();
+            drawLine(-30, 0, 110, 0);
+            ctx.restore();
+            // 画个秒针的圆圈圈样式
+            ctx.fillStyle = '#f00';
             ctx.beginPath();
             ctx.arc(0, 0, 10, 0, Math.PI * 2, true);
             ctx.fill();
-            ctx.arc(0, 0, 3, 0, Math.PI * 2, true);
-            ctx.fill();
-            ctx.restore();
             ctx.restore();
 
             requestAnimationFrame(animate);
