@@ -1,0 +1,290 @@
+<!-- 摘自掘金文章：https://juejin.cn/post/7539217631686475839 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电子签名合成工具</title>
+    <!-- 引入fabric.js（官网：https://fabricjs.com） -->
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+    <style>
+        *{
+            margin:0;
+            padding:0;
+            box-sizing: border-box;
+        }
+        body{
+            display:flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            width: 90%;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display:flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        #canvas {
+            border: 1px dashed #ccc;
+            background-color: #f9f9f9;
+        }
+        .signature-area {
+            margin: 20px 0;
+        }
+        #signaturePad {
+            border: 1px solid #333;
+            background-color: white;
+        }
+        .signature-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        .btn-group {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        .tips {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h3 style="padding-bottom: 5px;">合同图片签名区</h3>
+        <canvas id="canvas" width="800" height="400"></canvas>
+        
+        <div class="signature-area">
+            <h4>电子签名</h4>
+            <p class="tips">在下方画布签名，完成后点击保存签名</p>
+            <canvas id="signaturePad" width="800" height="150"></canvas>
+            
+            <!-- 新增签名操作区 -->
+            <div class="signature-actions">
+                <button id="clearCurrentSignature">清空当前签名</button>
+                <button id="saveSignature">保存签名到画布</button>
+                <button id="uploadImage">上传合同图片</button>
+                <input type="file" id="fileInput" accept="image/*" style="display:none">
+                <button id="removeSelected">删除选中签名</button>
+                <button id="clearCanvas">清空画布</button>
+            </div>
+        </div>    
+    </div>
+
+    <script>
+        // 初始化主画布
+        const canvas = new fabric.Canvas('canvas', {
+            preserveObjectStacking: true,
+            backgroundColor: '#fff',
+            enableTouchEvents: true
+        });
+
+        // 初始化签名板
+        const signaturePad = document.getElementById('signaturePad');
+        const sigCtx = signaturePad.getContext('2d');
+        let isDrawing = false;
+
+        // 设置签名线条样式
+        sigCtx.lineWidth = 2;
+        sigCtx.lineCap = 'round';
+        sigCtx.strokeStyle = '#000';
+
+        // 签名板事件绑定
+        signaturePad.addEventListener('mousedown', startDrawing);
+        signaturePad.addEventListener('mousemove', draw);
+        signaturePad.addEventListener('mouseup', stopDrawing);
+        signaturePad.addEventListener('mouseout', stopDrawing);
+
+        // 移动端触摸事件
+        signaturePad.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousedown', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            signaturePad.dispatchEvent(mouseEvent);
+        });
+
+        signaturePad.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousemove', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            signaturePad.dispatchEvent(mouseEvent);
+        });
+
+        signaturePad.addEventListener('touchend', () => {
+            const mouseEvent = new MouseEvent('mouseup');
+            signaturePad.dispatchEvent(mouseEvent);
+        });
+
+        // 签名绘制函数
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = signaturePad.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            sigCtx.beginPath();
+            sigCtx.moveTo(x, y);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = signaturePad.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            sigCtx.lineTo(x, y);
+            sigCtx.stroke();
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        // 核心功能：清空当前签名
+        document.getElementById('clearCurrentSignature').addEventListener('click', () => {
+            // 先判断是否有签名内容
+            const imageData = sigCtx.getImageData(0, 0, signaturePad.width, signaturePad.height);
+            const data = imageData.data;
+            let hasContent = false;
+            
+            // 检查画布是否有内容（跳过全透明像素）
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] > 0) { // alpha通道大于0
+                    hasContent = true;
+                    break;
+                }
+            }
+            
+            if (hasContent) {
+                sigCtx.clearRect(0, 0, signaturePad.width, signaturePad.height);
+            } else {
+                // 可以省略提示，也可以保留
+                // alert('签名区为空，无需清空');
+            }
+        });
+
+        // 上传图片功能
+        document.getElementById('uploadImage').addEventListener('click', () => {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                fabric.Image.fromURL(event.target.result, (img) => {
+                    const scale = Math.min(
+                        canvas.width / img.width,
+                        canvas.height / img.height,
+                        1
+                    );
+                    img.scale(scale);
+                    img.set({
+                        left: (canvas.width - img.width * scale) / 2,
+                        top: (canvas.height - img.height * scale) / 2,
+                        selectable: false
+                    });
+                    canvas.add(img);
+                    canvas.sendToBack(img);
+                });
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // 保存签名到主画布
+        document.getElementById('saveSignature').addEventListener('click', () => {
+            // 检查签名是否为空
+            const imageData = sigCtx.getImageData(0, 0, signaturePad.width, signaturePad.height);
+            const data = imageData.data;
+            let hasContent = false;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] > 0) {
+                    hasContent = true;
+                    break;
+                }
+            }
+            
+            if (!hasContent) {
+                alert('请先完成签名再保存');
+                return;
+            }
+            
+            const signatureImg = new Image();
+            signatureImg.src = signaturePad.toDataURL('image/png');
+            
+            signatureImg.onload = function() {
+                const fabricImg = new fabric.Image(signatureImg, {
+                    left: 100,
+                    top: 100,
+                    opacity: 1,
+                    // 启用缩放功能
+                    lockScalingX: false,
+                    lockScalingY: false,
+                    lockUniScaling: false,
+                    // 可选设置
+                    minScaleLimit: 0.3, // 最小缩放比例
+                    maxScaleLimit: 3,   // 最大缩放比例
+                    isSignature: true
+                });
+                canvas.add(fabricImg);
+                canvas.setActiveObject(fabricImg);
+                sigCtx.clearRect(0, 0, signaturePad.width, signaturePad.height);
+            };
+        });
+
+        // 删除画布中选中的签名
+        document.getElementById('removeSelected').addEventListener('click', () => {
+            const activeObj = canvas.getActiveObject();
+            if (activeObj) {
+                canvas.remove(activeObj);
+            } else {
+                alert('请先点击选中要删除的签名');
+            }
+        });
+
+        // 清空画布
+        document.getElementById('clearCanvas').addEventListener('click', () => {
+            if (canvas.getObjects().length > 0 && confirm('确定要清空所有内容吗？')) {
+                canvas.clear();
+            }
+        });
+
+        // 初始化时加载示例图片
+        fabric.Image.fromURL('https://picsum.photos/800/600', (img) => {
+            img.set({
+                left: 0,
+                top: 0,
+                selectable: false
+            });
+            canvas.add(img);
+            canvas.sendToBack(img);
+        });
+    </script>
+</body>
+</html>
