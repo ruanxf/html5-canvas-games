@@ -187,6 +187,7 @@
             link.download = '签名_' + new Date().toISOString().slice(0, 10) + '.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
+            document.body.removeChild(link);
         })
     </script>
 </html>
