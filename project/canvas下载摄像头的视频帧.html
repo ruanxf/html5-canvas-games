@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>canvas下载摄像头的视频帧</title>
+    <style>
+    </style>
+    <style>
+        button {
+            padding: 10px 20px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <video style="width: 500px; height: 350px;" autoplay></video>
+    <div class="controls">
+        <button style="background-color: #f00;" class="auth">获取摄像头权限</button>
+        <button class="take">拍照</button>
+        <button class="clear">清除照片</button>
+    </div>
+    <div style="margin-top: 10px;" class="box"></div>
+    <script>
+        const videoEle = document.querySelector("video");
+        document.querySelector('.auth').addEventListener('click', async function() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({audio: false, video: true});
+                var videoTracks = stream.getVideoTracks();
+                console.log("Using video device: " + videoTracks[0].label);
+                videoEle.srcObject = stream;
+            } catch (err) {
+                console.error('摄像头访问错误:', err);
+                alert('无法访问摄像头: ' + err.message);
+            }
+        })
+
+        // 使用视频实际尺寸
+        document.querySelector('.take').addEventListener('click', function() {
+            // 模拟拍照音效
+            const shutterSound = new Audio('./audio/meleweapon.ogg');
+            shutterSound.volume = 1;
+            shutterSound.play().catch(e => console.log('无法播放音效:', e));
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = videoEle.videoWidth / 2;
+            canvas.height = videoEle.videoHeight / 2;
+            
+            // 从video元素捕获画面
+            ctx.drawImage(videoEle, 0, 0, canvas.width, canvas.height);
+
+            // 转换为图片
+            const photoData = canvas.toDataURL('image/jpeg', 0.92);
+            console.log(photoData);
+            
+            // 创建并显示照片
+            const photo = document.createElement('img');
+            photo.src = photoData;
+            // 添加下载按钮
+            const downloadBtn = document.createElement('button');
+            downloadBtn.textContent = '下载';
+            downloadBtn.style.marginLeft = '10px';
+            downloadBtn.addEventListener('click', () => {
+                const link = document.createElement('a');
+                link.href = photoData;
+                link.download = `photo_${new Date().getTime()}.jpg`;
+                link.click();
+            });
+            document.querySelector('.box').append(photo, downloadBtn);
+        });
+        
+        document.querySelector('.clear').addEventListener('click', function() {
+            document.querySelector('.box').innerHTML = '';
+        })
+    </script>
+</body>
+
+</html>
