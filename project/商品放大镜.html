@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        .glassTitle {
+            color: #89cff0;
+            text-align: center;
+        }
+
+        .box {
+            width: 80vw;
+            min-width: 800px;
+            height: 80vh;
+            min-height: 600px;
+            line-height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            background-color: #f2f3f4;
+            margin: 10px auto;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px 1px #5d8aa8;
+        }
+
+        .glassWrapper {
+            line-height: 0;
+            position: relative;
+        }
+
+        .img {
+            display: block;
+            width: 250px;
+            height: auto;
+        }
+
+        .glass {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: #89cff0;
+            opacity: .5;
+            /* display: none; */
+        }
+
+        .bigWrapper {
+            position: relative;
+            width: 500px;
+            height: 500px;
+            background-color: #fff;
+            border: 1px dashed #89cff0;
+            border-radius: 10px;
+            overflow: scroll;
+        }
+
+        .bigImg {
+            width: 2500px;
+            /* display: none; */
+            position: absolute;
+        }
+    </style>
+</head>
+
+<body>
+    <h2 class="glassTitle">🔍放大镜练习</h2>
+    <div class="box">
+        <!-- 商品图 -->
+        <div class="glassWrapper">
+            <img src="http://ruanxiaofeng.bcc-szzj.baidu.com:8091/public/shenzhen_map.jpg" class="img">
+            <div class="glass"></div>
+        </div>
+        <!-- 放大器 -->
+        <div class="bigWrapper">
+            <img src="http://ruanxiaofeng.bcc-szzj.baidu.com:8091/public/shenzhen_map.jpg" class="bigImg">
+        </div>
+    </div>
+
+    <script>
+        const dom = {
+            box: document.querySelector('.box'),
+            glassBox: document.querySelector('.glassWrapper'),
+            img: document.querySelector('.img'),
+            glass: document.querySelector('.glass'),
+            bigWrapper: document.querySelector('.bigWrapper'),
+            bigImg: document.querySelector('.bigImg'),
+        }
+        console.log(dom);
+
+        // 1、 实现glass跟随鼠标移动
+        dom.glassBox.addEventListener('mouseover', () => {
+            console.log('mouseover 移动在某元素中ing');
+            dom.glass.style.display = 'block';
+            dom.bigImg.style.display = 'block';
+        })
+        dom.glassBox.addEventListener('mouseout', () => {
+            console.log('mouseout 移动出局ing');
+            dom.glass.style.display = 'none';
+            // dom.bigImg.style.display = 'none';
+        })
+
+        // 2、实现glass跟随鼠标移动，并且鼠标位于glass中央
+        dom.glassBox.addEventListener('mousemove', (e) => {
+            console.log('mousemove 移动ing');
+            // 鼠标距离 glassWrapper坐标原点(0,0)的距离x,y
+            const xOld = e.pageX - dom.glassBox.offsetLeft;
+            const yOld = e.pageY - dom.glassBox.offsetTop;
+            // 让鼠标在glass的中间位置
+            let x = xOld - dom.glass.offsetWidth / 2;
+            let y = yOld - dom.glass.offsetHeight / 2;
+            console.log(x, y);
+            console.log(dom.glassBox.offsetWidth);
+            console.log(dom.glass.offsetWidth);
+
+            // 3、glass不超出img内部
+            if (x <= 0) {
+                x = 0;
+            }
+            else if (x >= dom.glassBox.offsetWidth - dom.glass.offsetWidth) {
+                x = dom.glassBox.offsetWidth - dom.glass.offsetWidth
+            }
+            if (y <= 0) {
+                y = 0;
+            }
+            else if(y >= dom.glassBox.offsetHeight - dom.glass.offsetHeight) {
+                y = dom.glassBox.offsetHeight - dom.glass.offsetHeight;
+            }
+
+            dom.glass.style.left = `${x}px`;
+            dom.glass.style.top = `${y}px`;
+
+            // 4、重点：放大的图片的移动--较难理解
+            dom.bigImg.style.width = `${dom.img.offsetWidth * dom.bigWrapper.offsetWidth / dom.glass.offsetWidth}px`;
+            const bigImgX = (x / dom.glassBox.offsetWidth) * dom.bigImg.offsetWidth;
+            const bigImgY = (y / dom.glassBox.offsetHeight) * dom.bigImg.offsetHeight;
+            dom.bigImg.style.left = `-${bigImgX}px`;
+            dom.bigImg.style.top = `-${bigImgY}px`;
+        })
+    </script>
+</body>
+</html>
