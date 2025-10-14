@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据驱动CSS动画</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#3B82F6',
+            secondary: '#EC4899',
+          },
+        },
+      }
+    }
+  </script>
+  
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .animated-element {
+        /* 基础样式 + 过渡效果 */
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+  <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">数据驱动CSS动画演示</h1>
+    
+    <!-- 控制面板 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-gray-700 mb-2">旋转角度: <span id="rotateValue">0</span>°</label>
+          <input type="range" id="rotateControl" min="0" max="360" value="0" 
+                 class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+        </div>
+        
+        <div>
+          <label class="block text-gray-700 mb-2">X轴位移: <span id="translateXValue">0</span>px</label>
+          <input type="range" id="translateXControl" min="-300" max="300" value="0" 
+                 class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+        </div>
+      </div>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-gray-700 mb-2">缩放比例: <span id="scaleValue">1</span></label>
+          <input type="range" id="scaleControl" min="0.5" max="2" step="0.1" value="1" 
+                 class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+        </div>
+        
+        <div>
+          <label class="block text-gray-700 mb-2">透明度: <span id="opacityValue">1</span></label>
+          <input type="range" id="opacityControl" min="0" max="1" step="0.1" value="1" 
+                 class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+        </div>
+      </div>
+    </div>
+    
+    <!-- 动画元素 -->
+    <div class="flex justify-center my-12">
+      <div id="animatedBox" class="animated-element w-32 h-32 bg-primary rounded-lg flex items-center justify-center text-white text-4xl cursor-grab active:cursor-grabbing">
+        <i class="fa fa-cube"></i>
+      </div>
+    </div>
+    
+    <!-- 预设动画按钮 -->
+    <div class="flex flex-wrap gap-3 justify-center">
+      <button id="resetBtn" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors">
+        重置
+      </button>
+      <button id="spinBtn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+        旋转特效
+      </button>
+      <button id="bounceBtn" class="px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors">
+        弹跳特效
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // 状态数据管理
+    const animationState = {
+      rotate: 0,
+      translateX: 0,
+      scale: 1,
+      opacity: 1,
+      
+      // 更新状态并应用到DOM
+      update(property, value) {
+        this[property] = value;
+        this.applyTransform();
+        this.updateDisplay(property);
+      },
+      
+      // 应用变换到元素
+      applyTransform() {
+        const box = document.getElementById('animatedBox');
+        box.style.transform = `
+          rotate(${this.rotate}deg)
+          translateX(${this.translateX}px)
+          scale(${this.scale})
+        `;
+        box.style.opacity = this.opacity;
+      },
+      
+      // 更新显示的值
+      updateDisplay(property) {
+        document.getElementById(`${property}Value`).textContent = this[property];
+      },
+      
+      // 重置所有状态
+      reset() {
+        this.rotate = 0;
+        this.translateX = 0;
+        this.scale = 1;
+        this.opacity = 1;
+        this.applyTransform();
+        
+        // 更新所有控制器
+        Object.keys(this).forEach(key => {
+          if (typeof this[key] !== 'function' && document.getElementById(`${key}Control`)) {
+            document.getElementById(`${key}Control`).value = this[key];
+            this.updateDisplay(key);
+          }
+        });
+      }
+    };
+
+    // 绑定控制器事件
+    document.getElementById('rotateControl').addEventListener('input', (e) => {
+      animationState.update('rotate', parseInt(e.target.value));
+    });
+    
+    document.getElementById('translateXControl').addEventListener('input', (e) => {
+      animationState.update('translateX', parseInt(e.target.value));
+    });
+    
+    document.getElementById('scaleControl').addEventListener('input', (e) => {
+      animationState.update('scale', parseFloat(e.target.value));
+    });
+    
+    document.getElementById('opacityControl').addEventListener('input', (e) => {
+      animationState.update('opacity', parseFloat(e.target.value));
+    });
+
+    // 绑定按钮事件
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      animationState.reset();
+    });
+    
+    // 旋转特效 - 演示数据序列动画
+    document.getElementById('spinBtn').addEventListener('click', () => {
+      // 动画序列数据
+      const sequence = [
+        { rotate: 360, scale: 1.5, duration: 800 },
+        { rotate: 720, scale: 1, translateX: 200, duration: 600 },
+        { rotate: 1080, translateX: 0, duration: 800 }
+      ];
+      
+      playSequence(sequence);
+    });
+    
+    // 弹跳特效 - 演示物理效果的数据模拟
+    document.getElementById('bounceBtn').addEventListener('click', () => {
+      let position = 0;
+      let velocity = 15;
+      const gravity = 0.8;
+      const damping = 0.8;
+      
+      function bounce() {
+        position += velocity;
+        velocity += gravity;
+        
+        // 地面碰撞检测
+        if (position > 200) {
+          position = 200;
+          velocity = -velocity * damping;
+        }
+        
+        animationState.update('translateX', position);
+        
+        // 当速度足够小时停止动画
+        if (Math.abs(velocity) > 1) {
+          requestAnimationFrame(bounce);
+        } else {
+          // 回到初始位置
+          animationState.update('translateX', 0);
+        }
+      }
+      
+      bounce();
+    });
+
+    // 拖拽功能 - 演示交互数据采集
+    const box = document.getElementById('animatedBox');
+    let isDragging = false;
+    let startX;
+    let initialTranslateX;
+    
+    box.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX;
+      initialTranslateX = animationState.translateX;
+      box.classList.add('scale-105');
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const deltaX = e.clientX - startX;
+      animationState.update('translateX', initialTranslateX + deltaX);
+      // 同步更新滑块
+      document.getElementById('translateXControl').value = animationState.translateX;
+    });
+    
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      box.classList.remove('scale-105');
+    });
+
+    // 播放动画序列的工具函数
+    function playSequence(sequence) {
+      let currentStep = 0;
+      
+      function playStep() {
+        if (currentStep >= sequence.length) return;
+        
+        const step = sequence[currentStep];
+        const { duration, ...properties } = step;
+        
+        // 应用当前步骤的属性
+        Object.keys(properties).forEach(prop => {
+          animationState[prop] = properties[prop];
+          if (document.getElementById(`${prop}Control`)) {
+            document.getElementById(`${prop}Control`).value = properties[prop];
+          }
+        });
+        animationState.applyTransform();
+        Object.keys(properties).forEach(prop => {
+          animationState.updateDisplay(prop);
+        });
+        
+        // 延迟播放下一步
+        setTimeout(() => {
+          currentStep++;
+          playStep();
+        }, duration);
+      }
+      
+      playStep();
+    }
+
+    // 初始化
+    animationState.applyTransform();
+  </script>
+</body>
+</html>
