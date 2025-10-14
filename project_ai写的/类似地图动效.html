@@ -3,36 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>图片缩放平移查看器</title>
+    <title>高级图片查看器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                    },
+                }
+            }
+        }
+    </script>
     
     <style type="text/tailwindcss">
         @layer utilities {
             .viewer-container {
                 overflow: hidden;
-                touch-action: none; /* 禁用浏览器默认触摸行为 */
+                touch-action: none;
             }
             .image-content {
-                transition: transform 0.1s ease-out; /* 平滑过渡效果 */
-                will-change: transform; /* 性能优化 */
-                pointer-events: none; /* 禁止图片本身的点击事件 */
+                transition: transform 0.1s ease-out;
+                will-change: transform;
+                pointer-events: none;
+            }
+            .control-btn {
+                @apply px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2;
+            }
+            .tooltip {
+                @apply absolute opacity-0 transition-opacity duration-200 bg-black bg-opacity-80 text-white text-xs px-2 py-1 rounded whitespace-nowrap -mt-10;
+            }
+            .has-tooltip:hover .tooltip {
+                @apply opacity-100;
             }
         }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8">
     <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-4 md:p-6">
-        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-4">图片缩放平移查看器</h1>
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-4">高级图片查看器</h1>
         <p class="text-gray-600 mb-6">
             操作方式: 鼠标拖动移动图片，滚轮缩放；触摸屏幕拖动移动，双指缩放
         </p>
         
         <!-- 图片查看器容器 -->
-        <div id="viewer" class="viewer-container bg-gray-100 rounded-lg border border-gray-200 w-full h-[60vh] md:h-[70vh] relative">
+        <div id="viewer" class="viewer-container bg-gray-100 rounded-lg border border-gray-200 w-full h-[60vh] md:h-[70vh] relative cursor-grab active:cursor-grabbing">
             <!-- 加载提示 -->
             <div id="loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-70 z-10">
-                <i class="fa fa-circle-o-notch fa-spin text-4xl text-blue-500"></i>
+                <div class="flex flex-col items-center gap-3">
+                    <i class="fa fa-circle-o-notch fa-spin text-4xl text-primary"></i>
+                    <span class="text-gray-600">加载中...</span>
+                </div>
+            </div>
+            
+            <!-- 空状态提示 -->
+            <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-70 z-10 hidden">
+                <i class="fa fa-image text-4xl text-gray-400 mb-3"></i>
+                <span class="text-gray-600">未加载图片</span>
             </div>
             
             <!-- 图片容器 -->
@@ -40,195 +70,325 @@
                 <img 
                     id="targetImage" 
                     class="image-content max-w-none" 
-                    src="https://picsum.photos/1600/900" 
-                    alt="示例风景图片，用于演示缩放平移功能"
-                    onload="document.getElementById('loading').style.display='none'"
+                    src="http://ruanxiaofeng.bcc-szzj.baidu.com:8091/public/shenzhen_map.jpg"  <!-- 更换为竖版图片测试 -->
+                    alt="示例图片，用于演示缩放平移功能"
                 >
             </div>
             
-            <!-- 操作提示 -->
-            <div class="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white text-sm px-3 py-1.5 rounded-full flex items-center gap-2">
+            <!-- 操作提示 - 仅在首次加载或重置后短暂显示 -->
+            <div id="操作提示" class="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white text-sm px-3 py-1.5 rounded-full flex items-center gap-2 opacity-100 transition-opacity duration-1000">
                 <i class="fa fa-arrows" aria-hidden="true"></i>
                 <span>拖动移动</span>
                 <span class="mx-1">|</span>
                 <i class="fa fa-search-plus" aria-hidden="true"></i>
                 <span>滚轮/双指缩放</span>
             </div>
+            
+            <!-- 缩放比例显示 -->
+            <div class="absolute top-4 right-4 bg-black bg-opacity-50 text-white text-sm px-3 py-1.5 rounded-full">
+                <span id="scaleDisplay">100%</span>
+            </div>
         </div>
         
-        <!-- 控制按钮 -->
-        <div class="flex justify-center gap-4 mt-6">
-            <button id="resetBtn" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors flex items-center gap-2">
-                <i class="fa fa-refresh" aria-hidden="true"></i>
-                <span>重置视图</span>
-            </button>
-            <button id="zoomInBtn" class="px-4 py-2 bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors flex items-center gap-2">
-                <i class="fa fa-search-plus" aria-hidden="true"></i>
-                <span>放大</span>
-            </button>
-            <button id="zoomOutBtn" class="px-4 py-2 bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors flex items-center gap-2">
-                <i class="fa fa-search-minus" aria-hidden="true"></i>
-                <span>缩小</span>
-            </button>
+        <!-- 控制按钮区域 -->
+        <div class="flex flex-wrap justify-center gap-4 mt-6">
+            <div class="has-tooltip relative">
+                <button id="resetBtn" class="control-btn bg-gray-200 hover:bg-gray-300">
+                    <i class="fa fa-refresh" aria-hidden="true"></i>
+                    <span>重置视图</span>
+                </button>
+                <span class="tooltip">重置到初始视图</span>
+            </div>
+            
+            <div class="has-tooltip relative">
+                <button id="zoomInBtn" class="control-btn bg-primary text-white hover:bg-primary/90 hover:scale-105">
+                    <i class="fa fa-search-plus" aria-hidden="true"></i>
+                    <span>放大</span>
+                </button>
+                <span class="tooltip">放大图片 (Ctrl + +)</span>
+            </div>
+            
+            <div class="has-tooltip relative">
+                <button id="zoomOutBtn" class="control-btn bg-primary text-white hover:bg-primary/90 hover:scale-105">
+                    <i class="fa fa-search-minus" aria-hidden="true"></i>
+                    <span>缩小</span>
+                </button>
+                <span class="tooltip">缩小图片 (Ctrl + -)</span>
+            </div>
+            
+            <div class="has-tooltip relative">
+                <button id="fitBtn" class="control-btn bg-green-500 text-white hover:bg-green-600 hover:scale-105">
+                    <i class="fa fa-expand" aria-hidden="true"></i>
+                    <span>适应窗口</span>
+                </button>
+                <span class="tooltip">调整图片以适应窗口</span>
+            </div>
         </div>
     </div>
 
     <script>
-        // 状态管理 - 存储图片变换的所有数据
-        const viewState = {
-            scale: 1,          // 缩放比例
-            x: 0,              // X轴偏移
-            y: 0,              // Y轴偏移
-            isDragging: false, // 是否正在拖动
-            lastX: 0,          // 上一次的X坐标
-            lastY: 0,          // 上一次的Y坐标
-            startDistance: 0,  // 双指开始距离
-            startScale: 1,     // 双指开始时的缩放比例
-            image: null,       // 图片元素
-            container: null,   // 容器元素
-            imageWidth: 0,     // 图片原始宽度
-            imageHeight: 0,    // 图片原始高度
-            containerWidth: 0, // 容器宽度
-            containerHeight: 0,// 容器高度
+        // 图片查看器类 - 优化代码结构
+        class ImageViewer {
+            constructor(imageId, containerId) {
+                // 状态变量
+                this.state = {
+                    scale: 1,
+                    x: 0,
+                    y: 0,
+                    isDragging: false,
+                    lastX: 0,
+                    lastY: 0,
+                    startDistance: 0,
+                    startScale: 1,
+                    initialScale: 1,  // 初始最佳缩放比例
+                };
+                
+                // DOM元素
+                this.elements = {
+                    image: document.getElementById(imageId),
+                    container: document.getElementById(containerId),
+                    loading: document.getElementById('loading'),
+                    emptyState: document.getElementById('emptyState'),
+                    scaleDisplay: document.getElementById('scaleDisplay'),
+                    操作提示: document.getElementById('操作提示'),
+                    // 控制按钮
+                    resetBtn: document.getElementById('resetBtn'),
+                    zoomInBtn: document.getElementById('zoomInBtn'),
+                    zoomOutBtn: document.getElementById('zoomOutBtn'),
+                    fitBtn: document.getElementById('fitBtn')
+                };
+                
+                // 尺寸信息
+                this.dimensions = {
+                    imageWidth: 0,
+                    imageHeight: 0,
+                    containerWidth: 0,
+                    containerHeight: 0
+                };
+                
+                // 绑定事件处理函数
+                this.bindEvents();
+                
+                // 初始化
+                this.init();
+            }
             
             // 初始化
-            init(imageId, containerId) {
-                this.image = document.getElementById(imageId);
-                this.container = document.getElementById(containerId);
-                
-                // 等待图片加载完成后获取尺寸
-                if (this.image.complete) {
-                    this.setDimensions();
+            init() {
+                // 处理图片加载
+                if (this.elements.image.complete) {
+                    this.handleImageLoad();
                 } else {
-                    this.image.addEventListener('load', () => this.setDimensions());
+                    this.elements.image.addEventListener('load', () => this.handleImageLoad());
+                    this.elements.image.addEventListener('error', () => this.handleImageError());
                 }
                 
-                this.addEventListeners();
-                window.addEventListener('resize', () => {
-                    this.updateContainerDimensions();
-                    this.constrainPosition();
-                    this.updateTransform();
-                });
-            },
+                // 隐藏操作提示（延迟显示增强用户体验）
+                setTimeout(() => {
+                    this.elements.操作提示.style.opacity = '0';
+                }, 3000);
+            }
             
-            // 设置图片和容器尺寸
-            setDimensions() {
-                this.imageWidth = this.image.naturalWidth;
-                this.imageHeight = this.image.naturalHeight;
+            // 绑定所有事件
+            bindEvents() {
+                // 鼠标事件
+                this.elements.container.addEventListener('mousedown', (e) => this.startDrag(e));
+                document.addEventListener('mousemove', (e) => this.drag(e));
+                document.addEventListener('mouseup', () => this.endDrag());
+                this.elements.container.addEventListener('wheel', (e) => this.zoom(e));
+                
+                // 触摸事件
+                this.elements.container.addEventListener('touchstart', (e) => this.touchStart(e));
+                this.elements.container.addEventListener('touchmove', (e) => this.touchMove(e));
+                this.elements.container.addEventListener('touchend', () => this.touchEnd());
+                
+                // 按钮事件
+                this.elements.resetBtn.addEventListener('click', () => this.reset());
+                this.elements.zoomInBtn.addEventListener('click', () => this.zoomIn());
+                this.elements.zoomOutBtn.addEventListener('click', () => this.zoomOut());
+                this.elements.fitBtn.addEventListener('click', () => this.fitToWindow());
+                
+                // 键盘事件
+                document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+                
+                // 窗口大小变化
+                window.addEventListener('resize', () => this.handleResize());
+            }
+            
+            // 处理图片加载完成
+            handleImageLoad() {
+                // 获取图片原始尺寸
+                this.dimensions.imageWidth = this.elements.image.naturalWidth;
+                this.dimensions.imageHeight = this.elements.image.naturalHeight;
+                
+                // 更新容器尺寸
                 this.updateContainerDimensions();
-            },
+                
+                // 计算最佳初始缩放比例
+                this.calculateInitialScale();
+                
+                // 应用初始缩放
+                this.state.scale = this.state.initialScale;
+                this.state.x = 0;
+                this.state.y = 0;
+                this.updateTransform();
+                
+                // 隐藏加载状态
+                this.elements.loading.style.display = 'none';
+            }
+            
+            // 处理图片加载错误
+            handleImageError() {
+                this.elements.loading.style.display = 'none';
+                this.elements.emptyState.style.display = 'flex';
+            }
+            
+            // 计算最佳初始缩放比例
+            calculateInitialScale() {
+                // 计算图片宽高比和容器宽高比
+                const imageRatio = this.dimensions.imageWidth / this.dimensions.imageHeight;
+                const containerRatio = this.dimensions.containerWidth / this.dimensions.containerHeight;
+                
+                // 根据比例计算最佳缩放比例，确保图片完全显示在容器中
+                if (imageRatio > containerRatio) {
+                    // 图片更宽，按宽度缩放
+                    this.state.initialScale = this.dimensions.containerWidth / this.dimensions.imageWidth;
+                } else {
+                    // 图片更高，按高度缩放
+                    this.state.initialScale = this.dimensions.containerHeight / this.dimensions.imageHeight;
+                }
+            }
             
             // 更新容器尺寸
             updateContainerDimensions() {
-                const rect = this.container.getBoundingClientRect();
-                this.containerWidth = rect.width;
-                this.containerHeight = rect.height;
-            },
+                const rect = this.elements.container.getBoundingClientRect();
+                this.dimensions.containerWidth = rect.width;
+                this.dimensions.containerHeight = rect.height;
+            }
             
-            // 添加事件监听器
-            addEventListeners() {
-                // 鼠标事件
-                this.container.addEventListener('mousedown', (e) => this.startDrag(e));
-                document.addEventListener('mousemove', (e) => this.drag(e));
-                document.addEventListener('mouseup', () => this.endDrag());
-                this.container.addEventListener('wheel', (e) => this.zoom(e));
-                
-                // 触摸事件
-                this.container.addEventListener('touchstart', (e) => this.touchStart(e));
-                this.container.addEventListener('touchmove', (e) => this.touchMove(e));
-                this.container.addEventListener('touchend', () => this.touchEnd());
-                
-                // 按钮事件
-                document.getElementById('resetBtn').addEventListener('click', () => this.reset());
-                document.getElementById('zoomInBtn').addEventListener('click', () => this.zoomIn());
-                document.getElementById('zoomOutBtn').addEventListener('click', () => this.zoomOut());
-            },
+            // 处理窗口大小变化
+            handleResize() {
+                this.updateContainerDimensions();
+                this.calculateInitialScale();
+                this.constrainPosition();
+                this.updateTransform();
+            }
+            
+            // 处理键盘事件
+            handleKeyDown(e) {
+                // Ctrl + + 或 Ctrl + = 放大
+                if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
+                    e.preventDefault();
+                    this.zoomIn();
+                }
+                // Ctrl + - 缩小
+                else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+                    e.preventDefault();
+                    this.zoomOut();
+                }
+                // Esc 重置
+                else if (e.key === 'Escape') {
+                    this.reset();
+                }
+            }
             
             // 开始拖动（鼠标）
             startDrag(e) {
-                this.isDragging = true;
-                this.lastX = e.clientX - this.x;
-                this.lastY = e.clientY - this.y;
-                this.container.style.cursor = 'grabbing';
-            },
+                this.state.isDragging = true;
+                this.state.lastX = e.clientX - this.state.x;
+                this.state.lastY = e.clientY - this.state.y;
+                
+                // 显示操作提示
+                this.elements.操作提示.style.opacity = '100';
+                clearTimeout(this.hideTooltipTimer);
+                this.hideTooltipTimer = setTimeout(() => {
+                    this.elements.操作提示.style.opacity = '0';
+                }, 2000);
+            }
             
             // 拖动中（鼠标）
             drag(e) {
-                if (!this.isDragging) return;
+                if (!this.state.isDragging) return;
                 e.preventDefault();
                 
                 // 计算新的偏移量
-                this.x = e.clientX - this.lastX;
-                this.y = e.clientY - this.lastY;
+                this.state.x = e.clientX - this.state.lastX;
+                this.state.y = e.clientY - this.state.lastY;
                 
                 // 限制位置不超出边界
                 this.constrainPosition();
                 
                 // 应用变换
                 this.updateTransform();
-            },
+            }
             
             // 结束拖动（鼠标）
             endDrag() {
-                this.isDragging = false;
-                this.container.style.cursor = 'grab';
-            },
+                this.state.isDragging = false;
+            }
             
             // 缩放（鼠标滚轮）
             zoom(e) {
                 e.preventDefault();
                 
                 // 计算缩放中心（鼠标位置）
-                const rect = this.container.getBoundingClientRect();
+                const rect = this.elements.container.getBoundingClientRect();
                 const centerX = e.clientX - rect.left;
                 const centerY = e.clientY - rect.top;
                 
                 // 计算缩放前鼠标在图片上的相对位置
-                const mouseX = (centerX - this.x) / this.scale;
-                const mouseY = (centerY - this.y) / this.scale;
+                const mouseX = (centerX - this.state.x) / this.state.scale;
+                const mouseY = (centerY - this.state.y) / this.state.scale;
                 
-                // 调整缩放速率（比原来慢50%）
-                const delta = e.deltaY > 0 ? -0.05 : 0.05;
-                const newScale = Math.max(0.5, Math.min(this.scale + delta, 5));
+                // 调整缩放速率
+                const delta = e.deltaY > 0 ? -0.03 : 0.03;
+                const newScale = this.clampScale(this.state.scale + delta);
                 
                 // 如果达到缩放边界则不继续缩放
-                if (newScale === this.scale) return;
+                if (newScale === this.state.scale) return;
                 
-                this.scale = newScale;
+                this.state.scale = newScale;
                 
                 // 调整偏移量，使缩放围绕鼠标位置进行
-                this.x = centerX - mouseX * this.scale;
-                this.y = centerY - mouseY * this.scale;
+                this.state.x = centerX - mouseX * this.state.scale;
+                this.state.y = centerY - mouseY * this.state.scale;
                 
                 // 限制位置不超出边界
                 this.constrainPosition();
                 
                 // 应用变换
                 this.updateTransform();
-            },
+            }
             
             // 触摸开始
             touchStart(e) {
                 if (e.touches.length === 1) {
                     // 单指触摸 - 拖动
-                    this.isDragging = true;
-                    this.lastX = e.touches[0].clientX - this.x;
-                    this.lastY = e.touches[0].clientY - this.y;
+                    this.state.isDragging = true;
+                    this.state.lastX = e.touches[0].clientX - this.state.x;
+                    this.state.lastY = e.touches[0].clientY - this.state.y;
                 } else if (e.touches.length === 2) {
                     // 双指触摸 - 缩放
-                    this.startDistance = this.getTouchDistance(e);
-                    this.startScale = this.scale;
+                    this.state.startDistance = this.getTouchDistance(e);
+                    this.state.startScale = this.state.scale;
                 }
-            },
+                
+                // 显示操作提示
+                this.elements.操作提示.style.opacity = '100';
+                clearTimeout(this.hideTooltipTimer);
+                this.hideTooltipTimer = setTimeout(() => {
+                    this.elements.操作提示.style.opacity = '0';
+                }, 2000);
+            }
             
             // 触摸移动
             touchMove(e) {
                 e.preventDefault();
                 
-                if (e.touches.length === 1 && this.isDragging) {
+                if (e.touches.length === 1 && this.state.isDragging) {
                     // 单指拖动
-                    this.x = e.touches[0].clientX - this.lastX;
-                    this.y = e.touches[0].clientY - this.lastY;
+                    this.state.x = e.touches[0].clientX - this.state.lastX;
+                    this.state.y = e.touches[0].clientY - this.state.lastY;
                     
                     // 限制位置不超出边界
                     this.constrainPosition();
@@ -237,48 +397,48 @@
                 } else if (e.touches.length === 2) {
                     // 双指缩放
                     const currentDistance = this.getTouchDistance(e);
-                    const scaleFactor = currentDistance / this.startDistance;
+                    const scaleFactor = currentDistance / this.state.startDistance;
                     
-                    // 减缓缩放速度并限制范围
-                    const newScale = Math.max(0.5, Math.min(this.startScale * scaleFactor, 5));
+                    // 计算新缩放比例并限制范围
+                    const newScale = this.clampScale(this.state.startScale * scaleFactor);
                     
                     // 如果达到缩放边界则不继续缩放
-                    if (newScale === this.scale) return;
+                    if (newScale === this.state.scale) return;
                     
-                    this.scale = newScale;
+                    this.state.scale = newScale;
                     
                     // 计算双指中心点
                     const center = this.getTouchCenter(e);
-                    const rect = this.container.getBoundingClientRect();
+                    const rect = this.elements.container.getBoundingClientRect();
                     const centerX = center.x - rect.left;
                     const centerY = center.y - rect.top;
                     
                     // 计算缩放前中心点在图片上的相对位置
-                    const pointX = (centerX - this.x) / this.startScale;
-                    const pointY = (centerY - this.y) / this.startScale;
+                    const pointX = (centerX - this.state.x) / this.state.startScale;
+                    const pointY = (centerY - this.state.y) / this.state.startScale;
                     
                     // 调整偏移量，使缩放围绕双指中心进行
-                    this.x = centerX - pointX * this.scale;
-                    this.y = centerY - pointY * this.scale;
+                    this.state.x = centerX - pointX * this.state.scale;
+                    this.state.y = centerY - pointY * this.state.scale;
                     
                     // 限制位置不超出边界
                     this.constrainPosition();
                     
                     this.updateTransform();
                 }
-            },
+            }
             
             // 触摸结束
             touchEnd() {
-                this.isDragging = false;
-            },
+                this.state.isDragging = false;
+            }
             
             // 计算两指之间的距离
             getTouchDistance(e) {
                 const dx = e.touches[0].clientX - e.touches[1].clientX;
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 return Math.sqrt(dx * dx + dy * dy);
-            },
+            }
             
             // 计算两指的中心点
             getTouchCenter(e) {
@@ -286,62 +446,85 @@
                     x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
                     y: (e.touches[0].clientY + e.touches[1].clientY) / 2
                 };
-            },
+            }
             
             // 限制位置不超出边界
             constrainPosition() {
                 // 计算缩放后的图片尺寸
-                const scaledWidth = this.imageWidth * this.scale;
-                const scaledHeight = this.imageHeight * this.scale;
+                const scaledWidth = this.dimensions.imageWidth * this.state.scale;
+                const scaledHeight = this.dimensions.imageHeight * this.state.scale;
                 
                 // 计算最大允许偏移量（边界限制）
-                const maxX = Math.max(0, (scaledWidth - this.containerWidth) / 2);
-                const maxY = Math.max(0, (scaledHeight - this.containerHeight) / 2);
+                const maxX = Math.max(0, (scaledWidth - this.dimensions.containerWidth) / 2);
+                const maxY = Math.max(0, (scaledHeight - this.dimensions.containerHeight) / 2);
                 
                 // 应用边界限制
-                this.x = Math.max(-maxX, Math.min(this.x, maxX));
-                this.y = Math.max(-maxY, Math.min(this.y, maxY));
-            },
+                this.state.x = Math.max(-maxX, Math.min(this.state.x, maxX));
+                this.state.y = Math.max(-maxY, Math.min(this.state.y, maxY));
+            }
+            
+            // 限制缩放比例在有效范围内
+            clampScale(scale) {
+                // 最小缩放为初始最佳比例，最大为初始比例的10倍
+                return Math.max(this.state.initialScale, Math.min(scale, this.state.initialScale * 10));
+            }
             
             // 应用变换到图片
             updateTransform() {
-                this.image.style.transform = `translate(${this.x}px, ${this.y}px) scale(${this.scale})`;
-            },
+                this.elements.image.style.transform = `translate(${this.state.x}px, ${this.state.y}px) scale(${this.state.scale})`;
+                // 更新缩放比例显示
+                this.elements.scaleDisplay.textContent = `${Math.round(this.state.scale / this.state.initialScale * 100)}%`;
+            }
             
             // 重置视图
             reset() {
-                this.scale = 1;
-                this.x = 0;
-                this.y = 0;
+                this.state.scale = this.state.initialScale;
+                this.state.x = 0;
+                this.state.y = 0;
                 this.updateTransform();
-            },
+                
+                // 显示操作提示
+                this.elements.操作提示.style.opacity = '100';
+                clearTimeout(this.hideTooltipTimer);
+                this.hideTooltipTimer = setTimeout(() => {
+                    this.elements.操作提示.style.opacity = '0';
+                }, 2000);
+            }
+            
+            // 适应窗口
+            fitToWindow() {
+                this.state.scale = this.state.initialScale;
+                this.constrainPosition();
+                this.updateTransform();
+            }
             
             // 放大
             zoomIn() {
-                // 调整按钮放大速率
-                const newScale = Math.min(this.scale + 0.2, 5);
-                if (newScale !== this.scale) {
-                    this.scale = newScale;
-                    this.constrainPosition();
-                    this.updateTransform();
-                }
-            },
-            
-            // 缩小
-            zoomOut() {
-                // 调整按钮缩小速率
-                const newScale = Math.max(this.scale - 0.2, 0.5);
-                if (newScale !== this.scale) {
-                    this.scale = newScale;
+                const newScale = this.clampScale(this.state.scale + this.state.initialScale * 0.1);
+                if (newScale !== this.state.scale) {
+                    this.state.scale = newScale;
                     this.constrainPosition();
                     this.updateTransform();
                 }
             }
-        };
+            
+            // 缩小
+            zoomOut() {
+                const newScale = this.clampScale(this.state.scale - this.state.initialScale * 0.1);
+                if (newScale !== this.state.scale) {
+                    this.state.scale = newScale;
+                    this.constrainPosition();
+                    this.updateTransform();
+                }
+            }
+        }
         
         // 初始化图片查看器
         window.addEventListener('DOMContentLoaded', () => {
-            viewState.init('targetImage', 'viewer');
+            // 等待页面完全加载后初始化
+            setTimeout(() => {
+                const viewer = new ImageViewer('targetImage', 'viewer');
+            }, 100);
         });
     </script>
 </body>
