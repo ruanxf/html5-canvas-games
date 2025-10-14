@@ -16,6 +16,7 @@
             .image-content {
                 transition: transform 0.1s ease-out; /* 平滑过渡效果 */
                 will-change: transform; /* 性能优化 */
+                pointer-events: none; /* 禁止图片本身的点击事件 */
             }
         }
     </style>
@@ -31,7 +32,7 @@
         <div id="viewer" class="viewer-container bg-gray-100 rounded-lg border border-gray-200 w-full h-[60vh] md:h-[70vh] relative">
             <!-- 加载提示 -->
             <div id="loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-70 z-10">
-                <i class="fa fa-circle-o-notch fa-spin text-4xl text-primary"></i>
+                <i class="fa fa-circle-o-notch fa-spin text-4xl text-blue-500"></i>
             </div>
             
             <!-- 图片容器 -->
@@ -61,11 +62,11 @@
                 <i class="fa fa-refresh" aria-hidden="true"></i>
                 <span>重置视图</span>
             </button>
-            <button id="zoomInBtn" class="px-4 py-2 bg-primary text-white hover:bg-primary/90 rounded-lg transition-colors flex items-center gap-2">
+            <button id="zoomInBtn" class="px-4 py-2 bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors flex items-center gap-2">
                 <i class="fa fa-search-plus" aria-hidden="true"></i>
                 <span>放大</span>
             </button>
-            <button id="zoomOutBtn" class="px-4 py-2 bg-primary text-white hover:bg-primary/90 rounded-lg transition-colors flex items-center gap-2">
+            <button id="zoomOutBtn" class="px-4 py-2 bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors flex items-center gap-2">
                 <i class="fa fa-search-minus" aria-hidden="true"></i>
                 <span>缩小</span>
             </button>
@@ -85,12 +86,43 @@
             startScale: 1,     // 双指开始时的缩放比例
             image: null,       // 图片元素
             container: null,   // 容器元素
+            imageWidth: 0,     // 图片原始宽度
+            imageHeight: 0,    // 图片原始高度
+            containerWidth: 0, // 容器宽度
+            containerHeight: 0,// 容器高度
             
             // 初始化
             init(imageId, containerId) {
                 this.image = document.getElementById(imageId);
                 this.container = document.getElementById(containerId);
+                
+                // 等待图片加载完成后获取尺寸
+                if (this.image.complete) {
+                    this.setDimensions();
+                } else {
+                    this.image.addEventListener('load', () => this.setDimensions());
+                }
+                
                 this.addEventListeners();
+                window.addEventListener('resize', () => {
+                    this.updateContainerDimensions();
+                    this.constrainPosition();
+                    this.updateTransform();
+                });
+            },
+            
+            // 设置图片和容器尺寸
+            setDimensions() {
+                this.imageWidth = this.image.naturalWidth;
+                this.imageHeight = this.image.naturalHeight;
+                this.updateContainerDimensions();
+            },
+            
+            // 更新容器尺寸
+            updateContainerDimensions() {
+                const rect = this.container.getBoundingClientRect();
+                this.containerWidth = rect.width;
+                this.containerHeight = rect.height;
             },
             
             // 添加事件监听器
@@ -110,9 +142,6 @@
                 document.getElementById('resetBtn').addEventListener('click', () => this.reset());
                 document.getElementById('zoomInBtn').addEventListener('click', () => this.zoomIn());
                 document.getElementById('zoomOutBtn').addEventListener('click', () => this.zoomOut());
-                
-                // 窗口大小变化时重新计算
-                window.addEventListener('resize', () => this.updateTransform());
             },
             
             // 开始拖动（鼠标）
@@ -131,6 +160,9 @@
                 // 计算新的偏移量
                 this.x = e.clientX - this.lastX;
                 this.y = e.clientY - this.lastY;
+                
+                // 限制位置不超出边界
+                this.constrainPosition();
                 
                 // 应用变换
                 this.updateTransform();
@@ -155,13 +187,21 @@
                 const mouseX = (centerX - this.x) / this.scale;
                 const mouseY = (centerY - this.y) / this.scale;
                 
-                // 根据滚轮方向调整缩放比例
-                const delta = e.deltaY > 0 ? -0.1 : 0.1;
-                this.scale = Math.max(0.1, Math.min(this.scale + delta, 10));
+                // 调整缩放速率（比原来慢50%）
+                const delta = e.deltaY > 0 ? -0.05 : 0.05;
+                const newScale = Math.max(0.5, Math.min(this.scale + delta, 5));
+                
+                // 如果达到缩放边界则不继续缩放
+                if (newScale === this.scale) return;
+                
+                this.scale = newScale;
                 
                 // 调整偏移量，使缩放围绕鼠标位置进行
                 this.x = centerX - mouseX * this.scale;
                 this.y = centerY - mouseY * this.scale;
+                
+                // 限制位置不超出边界
+                this.constrainPosition();
                 
                 // 应用变换
                 this.updateTransform();
@@ -189,12 +229,23 @@
                     // 单指拖动
                     this.x = e.touches[0].clientX - this.lastX;
                     this.y = e.touches[0].clientY - this.lastY;
+                    
+                    // 限制位置不超出边界
+                    this.constrainPosition();
+                    
                     this.updateTransform();
                 } else if (e.touches.length === 2) {
                     // 双指缩放
                     const currentDistance = this.getTouchDistance(e);
                     const scaleFactor = currentDistance / this.startDistance;
-                    this.scale = Math.max(0.1, Math.min(this.startScale * scaleFactor, 10));
+                    
+                    // 减缓缩放速度并限制范围
+                    const newScale = Math.max(0.5, Math.min(this.startScale * scaleFactor, 5));
+                    
+                    // 如果达到缩放边界则不继续缩放
+                    if (newScale === this.scale) return;
+                    
+                    this.scale = newScale;
                     
                     // 计算双指中心点
                     const center = this.getTouchCenter(e);
@@ -209,6 +260,9 @@
                     // 调整偏移量，使缩放围绕双指中心进行
                     this.x = centerX - pointX * this.scale;
                     this.y = centerY - pointY * this.scale;
+                    
+                    // 限制位置不超出边界
+                    this.constrainPosition();
                     
                     this.updateTransform();
                 }
@@ -234,6 +288,21 @@
                 };
             },
             
+            // 限制位置不超出边界
+            constrainPosition() {
+                // 计算缩放后的图片尺寸
+                const scaledWidth = this.imageWidth * this.scale;
+                const scaledHeight = this.imageHeight * this.scale;
+                
+                // 计算最大允许偏移量（边界限制）
+                const maxX = Math.max(0, (scaledWidth - this.containerWidth) / 2);
+                const maxY = Math.max(0, (scaledHeight - this.containerHeight) / 2);
+                
+                // 应用边界限制
+                this.x = Math.max(-maxX, Math.min(this.x, maxX));
+                this.y = Math.max(-maxY, Math.min(this.y, maxY));
+            },
+            
             // 应用变换到图片
             updateTransform() {
                 this.image.style.transform = `translate(${this.x}px, ${this.y}px) scale(${this.scale})`;
@@ -249,14 +318,24 @@
             
             // 放大
             zoomIn() {
-                this.scale = Math.min(this.scale + 0.5, 10);
-                this.updateTransform();
+                // 调整按钮放大速率
+                const newScale = Math.min(this.scale + 0.2, 5);
+                if (newScale !== this.scale) {
+                    this.scale = newScale;
+                    this.constrainPosition();
+                    this.updateTransform();
+                }
             },
             
             // 缩小
             zoomOut() {
-                this.scale = Math.max(this.scale - 0.5, 0.1);
-                this.updateTransform();
+                // 调整按钮缩小速率
+                const newScale = Math.max(this.scale - 0.2, 0.5);
+                if (newScale !== this.scale) {
+                    this.scale = newScale;
+                    this.constrainPosition();
+                    this.updateTransform();
+                }
             }
         };
         
